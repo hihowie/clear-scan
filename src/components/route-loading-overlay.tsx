@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Progress } from '@/components/ui/progress'
 import { hasCachedEngineAsset } from '@/lib/engine-cache'
 
+const ROUTE_LOADING_DELAY_MS = 300
+
 export function RouteLoadingOverlay({ scanner = false }: { scanner?: boolean }) {
   return (
     <div
@@ -20,18 +22,34 @@ export function RouteLoadingOverlay({ scanner = false }: { scanner?: boolean }) 
   )
 }
 
+function useRouteLoadingDelay() {
+  const [elapsed, setElapsed] = useState(false)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setElapsed(true), ROUTE_LOADING_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  return elapsed
+}
+
+export function RouteLoadingFallback() {
+  return useRouteLoadingDelay() ? <RouteLoadingOverlay /> : null
+}
+
 export function ScannerRouteLoadingFallback() {
-  const [show, setShow] = useState(false)
+  const delayElapsed = useRouteLoadingDelay()
+  const [engineCached, setEngineCached] = useState<boolean>()
 
   useEffect(() => {
     let cancelled = false
     void hasCachedEngineAsset().then((cached) => {
-      if (!cancelled) setShow(!cached)
+      if (!cancelled) setEngineCached(cached)
     })
     return () => {
       cancelled = true
     }
   }, [])
 
-  return show ? <RouteLoadingOverlay scanner /> : null
+  return delayElapsed && engineCached === false ? <RouteLoadingOverlay scanner /> : null
 }

@@ -2,13 +2,11 @@ import { lazy, Suspense } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/app-shell'
 import {
-  RouteLoadingOverlay,
+  RouteLoadingFallback,
   ScannerRouteLoadingFallback,
 } from '@/components/route-loading-overlay'
+import { HomePage } from '@/pages/home-page'
 
-const HomePage = lazy(() =>
-  import('@/pages/home-page').then((module) => ({ default: module.HomePage })),
-)
 const HistoryPage = lazy(() =>
   import('@/pages/history-page').then((module) => ({ default: module.HistoryPage })),
 )
@@ -33,18 +31,11 @@ export default function App() {
     <HashRouter>
       <Routes>
         <Route element={<AppShell />}>
-          <Route
-            index
-            element={
-              <Suspense fallback={<RouteLoadingOverlay />}>
-                <HomePage />
-              </Suspense>
-            }
-          />
+          <Route index element={<HomePage />} />
           <Route
             path="history"
             element={
-              <Suspense fallback={<RouteLoadingOverlay />}>
+              <Suspense fallback={<RouteLoadingFallback />}>
                 <HistoryPage />
               </Suspense>
             }

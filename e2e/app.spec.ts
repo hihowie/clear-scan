@@ -2,12 +2,56 @@ import path from 'node:path'
 import { expect, test } from '@playwright/test'
 import { waitForScannerReady } from './helpers'
 
-test('home page exposes all three scan modes', async ({ page }) => {
-  await page.goto('/')
+test('home page loads synchronously without a route loading overlay', async ({ page }) => {
+  let releaseHomePage!: () => void
+  const homePageGate = new Promise<void>((resolve) => {
+    releaseHomePage = resolve
+  })
+  await page.route(/\/src\/pages\/home-page\.tsx(?:\?|$)/, async (route) => {
+    await homePageGate
+    await route.continue()
+  })
+
+  const navigation = page.goto('/')
+  await page.waitForTimeout(300)
+  await expect(page.getByText('正在打开页面', { exact: true })).toBeHidden()
+
+  releaseHomePage()
+  await navigation
   await expect(page.getByRole('heading', { name: /清晰扫描仪/ })).toBeVisible()
   await expect(page.getByText('身份证扫描', { exact: true })).toBeVisible()
   await expect(page.getByText('护照扫描', { exact: true })).toBeVisible()
   await expect(page.getByText('文档扫描', { exact: true })).toBeVisible()
+})
+
+test('cached lazy pages do not flash a route loading overlay', async ({ page }) => {
+  await page.goto('/#/history')
+  await expect(page.getByRole('heading', { name: '扫描记录', exact: true })).toBeVisible()
+
+  await page.addInitScript(() => {
+    const state = window as typeof window & { routeLoadingOverlaySeen?: boolean }
+    state.routeLoadingOverlaySeen = false
+    const recordOverlay = () => {
+      if (
+        [...document.querySelectorAll('[role="status"]')].some((element) =>
+          element.textContent?.includes('正在打开页面'),
+        )
+      ) {
+        state.routeLoadingOverlaySeen = true
+      }
+    }
+    new MutationObserver(recordOverlay).observe(document, { childList: true, subtree: true })
+  })
+
+  await page.goto('/')
+  await page.locator('a[href="#/history"]:visible').click()
+  await expect(page.getByRole('heading', { name: '扫描记录', exact: true })).toBeVisible()
+  expect(
+    await page.evaluate(
+      () =>
+        (window as typeof window & { routeLoadingOverlaySeen?: boolean }).routeLoadingOverlaySeen,
+    ),
+  ).toBe(false)
 })
 
 test('shows immediate feedback while the scan page bundle is still loading', async ({ page }) => {
