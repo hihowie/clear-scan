@@ -115,6 +115,20 @@ a {
   display: none;
 }
 
+@keyframes progress-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+.progress-indeterminate {
+  width: 34%;
+  animation: progress-indeterminate 1.35s ease-in-out infinite;
+}
+
 @media (max-width: 767px) {
   body {
     padding-bottom: calc(4rem + env(safe-area-inset-bottom));
@@ -129,5 +143,10 @@ a {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .progress-indeterminate {
+    animation: none !important;
+    transform: translateX(95%);
   }
 }

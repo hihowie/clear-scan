@@ -1,4 +1,5 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { toast } from 'sonner'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_QUAD } from '@/lib/geometry'
 import { scannerClient } from '@/lib/scanner-client'
@@ -96,5 +97,24 @@ describe('useScanPreview', () => {
     rerender({ page: makePage('page-2'), enabled: false })
     expect(result.current.preview).toBeUndefined()
     expect(revokeUrl).toHaveBeenCalledWith('blob:preview')
+  })
+
+  it('offers a retry when preview generation fails', async () => {
+    const render = vi
+      .spyOn(scannerClient, 'render')
+      .mockRejectedValueOnce(new Error('temporary failure'))
+      .mockResolvedValueOnce({ blob: new Blob(['preview']), width: 100, height: 80 })
+    const toastError = vi.spyOn(toast, 'error')
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    const { result } = renderHook(() => useScanPreview(makePage(), true))
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('预览生成失败', expect.anything()))
+    const options = toastError.mock.calls[0][1] as { action?: { onClick: () => void } }
+
+    act(() => options.action?.onClick())
+
+    await waitFor(() => expect(result.current.preview?.url).toBe('blob:preview'))
+    expect(render).toHaveBeenCalledTimes(2)
   })
 })

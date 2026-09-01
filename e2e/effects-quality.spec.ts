@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { waitForScannerReady } from './helpers'
 
 interface RegionStats {
   red: number
@@ -254,6 +255,7 @@ async function selectEffect(page: Page, category: string, effect: string, previo
 
 test('desktop and mobile render market-style document enhancement', async ({ page }) => {
   await page.goto('/#/scan/document')
+  await waitForScannerReady(page)
   await page
     .locator('input[type="file"]')
     .nth(1)
@@ -384,6 +386,7 @@ test('desktop and mobile render market-style document enhancement', async ({ pag
 
 test('brightness balance leaves evenly lit scans stable', async ({ page }) => {
   await page.goto('/#/scan/document')
+  await waitForScannerReady(page)
   await page
     .locator('input[type="file"]')
     .nth(1)
@@ -409,6 +412,7 @@ test('brightness balance leaves evenly lit scans stable', async ({ page }) => {
 
 test('brightness balance lowers a dominant bright area while lifting shadows', async ({ page }) => {
   await page.goto('/#/scan/document')
+  await waitForScannerReady(page)
   await page
     .locator('input[type="file"]')
     .nth(1)

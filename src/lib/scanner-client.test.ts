@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_QUAD } from './geometry'
-import { ScannerClient, createRenderCacheKey, isAbortError } from './scanner-client'
+import {
+  ENGINE_INITIALIZATION_TIMEOUT_MS,
+  ENGINE_TIMEOUT_MESSAGE,
+  ScannerClient,
+  createRenderCacheKey,
+  isAbortError,
+} from './scanner-client'
 import {
   DEFAULT_ADJUSTMENTS,
   SMART_EFFECTS,
@@ -73,6 +79,7 @@ describe('scanner request scheduling', () => {
     const detection = client.detect(new Blob(['source']), 'document', undefined, { onProgress })
     const worker = WorkerMock.instances[0]
     const request = worker.messages[0]
+    expect(onProgress).toHaveBeenCalledWith(0, '正在下载图像引擎（约 11 MB），可能需要一些时间')
 
     worker.respond({
       id: '__bootstrap__',
@@ -80,7 +87,7 @@ describe('scanner request scheduling', () => {
       progress: 6,
       label: '图像 Worker 已启动',
     })
-    expect(onProgress).not.toHaveBeenCalled()
+    expect(onProgress).toHaveBeenCalledTimes(1)
 
     worker.respond({
       id: request.id,
@@ -89,6 +96,7 @@ describe('scanner request scheduling', () => {
       label: '正在分析文档边缘',
     })
     expect(onProgress).toHaveBeenCalledWith(35, '正在分析文档边缘')
+    expect(client.isReady).toBe(true)
 
     worker.respond({
       id: request.id,
@@ -145,12 +153,37 @@ describe('scanner request scheduling', () => {
 
   it('prewarms once and reuses an identical export render', async () => {
     const client = new ScannerClient()
-    const warming = client.prewarm()
+    const firstProgress = vi.fn()
+    const warming = client.prewarm({ onProgress: firstProgress })
     const worker = WorkerMock.instances[0]
     expect(worker.messages[0].type).toBe('init')
+    expect(client.isReady).toBe(false)
+    expect(firstProgress).toHaveBeenLastCalledWith(
+      5,
+      '正在下载图像引擎（约 11 MB），可能需要一些时间',
+    )
+
+    worker.respond({
+      id: worker.messages[0].id,
+      type: 'progress',
+      progress: 14,
+      label: '正在编译图像算法',
+    })
+    expect(firstProgress).toHaveBeenLastCalledWith(60, '正在编译图像算法')
+
+    const joinedProgress = vi.fn()
+    const joinedWarming = client.prewarm({ onProgress: joinedProgress })
+    expect(joinedProgress).toHaveBeenLastCalledWith(60, '正在编译图像算法')
+
     worker.respond({ id: worker.messages[0].id, type: 'ready' })
-    await warming
-    await client.prewarm()
+    await Promise.all([warming, joinedWarming])
+    expect(client.isReady).toBe(true)
+    expect(firstProgress).toHaveBeenLastCalledWith(100, '图像引擎已就绪')
+    expect(joinedProgress).toHaveBeenLastCalledWith(100, '图像引擎已就绪')
+
+    const readyProgress = vi.fn()
+    await client.prewarm({ onProgress: readyProgress })
+    expect(readyProgress).toHaveBeenCalledWith(100, '图像引擎已就绪')
     expect(worker.messages).toHaveLength(1)
 
     const page = makePage()
@@ -183,6 +216,92 @@ describe('scanner request scheduling', () => {
       height: 2250,
     })
     expect((await rerendered).blob).not.toBe(rendered.blob)
+  })
+
+  it('stops a timed-out engine initialization and allows retrying it', async () => {
+    vi.useFakeTimers()
+    try {
+      const client = new ScannerClient()
+      const warming = client.prewarm()
+      const failure = warming.catch((error: unknown) => error)
+      const firstWorker = WorkerMock.instances[0]
+
+      await vi.advanceTimersByTimeAsync(ENGINE_INITIALIZATION_TIMEOUT_MS)
+
+      expect(await failure).toMatchObject({ message: ENGINE_TIMEOUT_MESSAGE })
+      expect(firstWorker.terminated).toBe(true)
+      expect(client.isReady).toBe(false)
+
+      const retry = client.prewarm()
+      const secondWorker = WorkerMock.instances[1]
+      expect(secondWorker.messages[0].type).toBe('init')
+      secondWorker.respond({ id: secondWorker.messages[0].id, type: 'ready' })
+
+      await retry
+      expect(client.isReady).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('uses the engine timeout while a cold detection is still initializing', async () => {
+    vi.useFakeTimers()
+    try {
+      const client = new ScannerClient()
+      let settled = false
+      const failure = client
+        .detect(new Blob(['source']), 'document')
+        .catch((error: unknown) => error)
+        .finally(() => {
+          settled = true
+        })
+
+      await vi.advanceTimersByTimeAsync(90_000)
+      expect(settled).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(ENGINE_INITIALIZATION_TIMEOUT_MS - 90_000)
+      expect(await failure).toMatchObject({ message: ENGINE_TIMEOUT_MESSAGE })
+      expect(WorkerMock.instances[0].terminated).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('lets detection consumers cancel without reporting a processing failure', async () => {
+    const client = new ScannerClient()
+    const controller = new AbortController()
+    const onProgress = vi.fn()
+    const detection = client.detect(new Blob(['source']), 'document', undefined, {
+      signal: controller.signal,
+      onProgress,
+    })
+    const failure = detection.catch((error: unknown) => error)
+    const worker = WorkerMock.instances[0]
+
+    controller.abort()
+    expect(isAbortError(await failure)).toBe(true)
+    expect(worker.terminated).toBe(false)
+
+    worker.respond({
+      id: worker.messages[0].id,
+      type: 'progress',
+      progress: 35,
+      label: '正在分析文档边缘',
+    })
+    worker.respond({
+      id: worker.messages[0].id,
+      type: 'detected',
+      result: {
+        width: 1200,
+        height: 900,
+        corners: DEFAULT_QUAD,
+        confidence: 0.9,
+        cornerSource: 'detected',
+        glareLevel: 'none',
+      },
+    })
+    expect(onProgress).toHaveBeenCalledTimes(1)
+    expect(client.isReady).toBe(true)
   })
 })
 

@@ -38,6 +38,7 @@ export function HistoryPage() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | ScanMode>('all')
   const [deleteId, setDeleteId] = useState<string>()
+  const [deleting, setDeleting] = useState(false)
   const [clearOpen, setClearOpen] = useState(false)
   const [clearing, setClearing] = useState(false)
 
@@ -52,11 +53,27 @@ export function HistoryPage() {
   )
 
   const confirmDelete = async () => {
-    if (!deleteId) return
-    await deleteProject(deleteId)
-    setDeleteId(undefined)
-    await reload()
-    toast.success('扫描项目已删除')
+    if (!deleteId || deleting) return
+    const projectId = deleteId
+    setDeleting(true)
+    try {
+      await deleteProject(projectId)
+      setDeleteId(undefined)
+      toast.success('扫描项目已删除')
+      try {
+        await reload()
+      } catch (reason) {
+        toast.error('扫描记录刷新失败', {
+          description: reason instanceof Error ? reason.message : '请刷新页面后重试',
+        })
+      }
+    } catch (reason) {
+      toast.error('扫描项目删除失败', {
+        description: reason instanceof Error ? reason.message : '请稍后重试',
+      })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const clearAll = async () => {
@@ -162,7 +179,10 @@ export function HistoryPage() {
         </Card>
       )}
 
-      <Dialog open={Boolean(deleteId)} onOpenChange={(open) => !open && setDeleteId(undefined)}>
+      <Dialog
+        open={Boolean(deleteId)}
+        onOpenChange={(open) => !open && !deleting && setDeleteId(undefined)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>删除这个扫描项目？</DialogTitle>
@@ -171,12 +191,12 @@ export function HistoryPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteId(undefined)}>
+            <Button variant="outline" disabled={deleting} onClick={() => setDeleteId(undefined)}>
               取消
             </Button>
-            <Button variant="destructive" onClick={() => void confirmDelete()}>
-              <Trash2 />
-              删除
+            <Button variant="destructive" disabled={deleting} onClick={() => void confirmDelete()}>
+              {deleting ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
+              {deleting ? '正在删除' : '删除'}
             </Button>
           </div>
         </DialogContent>

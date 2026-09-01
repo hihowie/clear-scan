@@ -57,13 +57,20 @@ export function CameraDialog({
           return
         }
         streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          await videoRef.current.play()
+        try {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream
+            await videoRef.current.play()
+          }
+        } catch (reason) {
+          stream.getTracks().forEach((track) => track.stop())
+          if (streamRef.current === stream) streamRef.current = undefined
+          throw reason
         }
         setLoading(false)
       })
       .catch((reason: unknown) => {
+        if (cancelled) return
         setLoading(false)
         setError(reason instanceof Error ? reason.message : '无法访问摄像头')
       })

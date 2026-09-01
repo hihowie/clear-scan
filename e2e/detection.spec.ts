@@ -3,6 +3,7 @@ import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import { DETECTION_CONFIDENCE_THRESHOLD } from '../src/lib/document-detection'
 import type { NormalizedQuad, ScanMode } from '../src/lib/types'
+import { waitForScannerReady } from './helpers'
 
 interface DetectionCase {
   fixture: string
@@ -155,6 +156,7 @@ test('detects difficult document edges and rejects scenes without a document', a
       await page.goto(`/#/scan/${scenario.mode}`)
       const fileName = `${scenario.fixture.replace(/\.svg$/, '')}.png`
       const buffer = await rasterizeSvg(page, scenario.fixture)
+      await waitForScannerReady(page)
       await page.locator('input[type="file"]').nth(1).setInputFiles({
         name: fileName,
         mimeType: 'image/png',
@@ -207,6 +209,7 @@ test('keeps the image worker stable across ten consecutive detections', async ({
 
   for (let index = 0; index < 10; index += 1) {
     const fileName = `repeat-${index}.png`
+    await waitForScannerReady(page)
     await page.locator('input[type="file"]').nth(1).setInputFiles({
       name: fileName,
       mimeType: 'image/png',

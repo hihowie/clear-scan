@@ -27,8 +27,6 @@ export function ScanCaptureWorkspace({
   passportLayout,
   nextRole,
   busy,
-  progress,
-  progressLabel,
   onPassportLayoutChange,
   onFiles,
 }: {
@@ -36,8 +34,6 @@ export function ScanCaptureWorkspace({
   passportLayout: PassportLayout
   nextRole: PageRole
   busy: boolean
-  progress: number
-  progressLabel: string
   onPassportLayoutChange: (layout: PassportLayout) => void
   onFiles: (files: File[]) => void
 }) {
@@ -51,20 +47,46 @@ export function ScanCaptureWorkspace({
         onPassportLayoutChange={onPassportLayoutChange}
         onFiles={onFiles}
       />
-      {busy && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-[#081711]/55 p-6 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-3xl bg-background p-6 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <LoaderCircle className="size-5 animate-spin text-primary" />
-              <div>
-                <p className="text-sm font-bold">正在处理照片</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{progressLabel}</p>
-              </div>
-            </div>
-            <Progress value={progress} className="mt-4" />
+    </div>
+  )
+}
+
+export function ScanProcessingOverlay({
+  open,
+  progress,
+  indeterminate,
+  title,
+  label,
+}: {
+  open: boolean
+  progress: number
+  indeterminate: boolean
+  title: string
+  label: string
+}) {
+  if (!open) return null
+  const normalizedProgress = Math.max(0, Math.min(100, progress))
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-[#081711]/55 p-6 backdrop-blur-sm"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="w-full max-w-sm rounded-3xl bg-background p-6 shadow-2xl">
+        <div className="flex items-center gap-3">
+          <LoaderCircle className="size-5 animate-spin text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold">{title}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
           </div>
+          {!indeterminate && (
+            <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+              {Math.round(normalizedProgress)}%
+            </span>
+          )}
         </div>
-      )}
+        <Progress value={normalizedProgress} indeterminate={indeterminate} className="mt-4" />
+      </div>
     </div>
   )
 }
@@ -118,7 +140,7 @@ function CropControls({
         <RotateCcw />
         重新识别
       </Button>
-      <Button size="lg" className="w-full" onClick={onConfirm}>
+      <Button size="lg" className="w-full" disabled={busy} onClick={onConfirm}>
         <Check />
         确认裁剪
       </Button>

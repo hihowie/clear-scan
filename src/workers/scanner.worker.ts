@@ -87,7 +87,7 @@ async function detectDocument(
   mode: ScanMode,
   passportLayout?: PassportLayout,
 ) {
-  post({ id, type: 'progress', progress: 8, label: '正在载入本地图像引擎' })
+  post({ id, type: 'progress', progress: 8, label: '正在读取照片' })
   await ensureOpenCv(id)
   clearRenderPipelineCache()
   const cv = cvRuntime

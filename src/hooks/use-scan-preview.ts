@@ -21,6 +21,7 @@ export function useScanPreview(page: ScanPage | undefined, enabled: boolean) {
   const pageRef = useRef(page)
   const [preview, setPreview] = useState<RenderedPreview>()
   const [rendering, setRendering] = useState(false)
+  const [retryVersion, setRetryVersion] = useState(0)
   pageRef.current = page
 
   const renderKey = page ? createRenderCacheKey(page, PREVIEW_RENDER_OPTIONS) : undefined
@@ -43,6 +44,7 @@ export function useScanPreview(page: ScanPage | undefined, enabled: boolean) {
   useEffect(
     () => () => {
       if (previewRef.current) URL.revokeObjectURL(previewRef.current.url)
+      toast.dismiss('preview-render-error')
     },
     [],
   )
@@ -61,6 +63,7 @@ export function useScanPreview(page: ScanPage | undefined, enabled: boolean) {
         })
         .then(({ blob }) => {
           if (cancelled) return
+          toast.dismiss('preview-render-error')
           replacePreview({
             pageId: currentPage.id,
             renderKey,
@@ -71,7 +74,13 @@ export function useScanPreview(page: ScanPage | undefined, enabled: boolean) {
         .catch((reason: unknown) => {
           if (!cancelled && !isAbortError(reason))
             toast.error('预览生成失败', {
+              id: 'preview-render-error',
               description: reason instanceof Error ? reason.message : '请重试',
+              action: {
+                label: '重新生成',
+                onClick: () => setRetryVersion((current) => current + 1),
+              },
+              duration: Infinity,
             })
         })
         .finally(() => !cancelled && setRendering(false))
@@ -81,7 +90,7 @@ export function useScanPreview(page: ScanPage | undefined, enabled: boolean) {
       controller.abort()
       window.clearTimeout(timer)
     }
-  }, [enabled, page?.source, renderKey, replacePreview])
+  }, [enabled, page?.source, renderKey, replacePreview, retryVersion])
 
   const activePreview = preview?.pageId === page?.id ? preview : undefined
   const isCurrent = Boolean(activePreview && activePreview.renderKey === renderKey)

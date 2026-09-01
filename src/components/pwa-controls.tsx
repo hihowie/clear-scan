@@ -33,7 +33,13 @@ export function PwaLifecycle() {
       description: '更新会在你确认后加载。',
       action: {
         label: '立即更新',
-        onClick: () => void updateServiceWorker(true),
+        onClick: () => {
+          void updateServiceWorker(true).catch((reason: unknown) => {
+            toast.error('应用更新失败', {
+              description: reason instanceof Error ? reason.message : '请刷新页面后重试',
+            })
+          })
+        },
       },
       duration: 10_000,
     })
@@ -79,15 +85,21 @@ export function InstallButton() {
   if (standalone) return null
 
   const install = async () => {
-    if (prompt) {
-      await prompt.prompt()
-      await prompt.userChoice
-      setPrompt(undefined)
-    } else if (isIos) {
-      setShowIos(true)
-    } else {
-      toast('可通过浏览器菜单安装', {
-        description: '选择“安装应用”或“创建快捷方式”。',
+    try {
+      if (prompt) {
+        await prompt.prompt()
+        await prompt.userChoice
+        setPrompt(undefined)
+      } else if (isIos) {
+        setShowIos(true)
+      } else {
+        toast('可通过浏览器菜单安装', {
+          description: '选择“安装应用”或“创建快捷方式”。',
+        })
+      }
+    } catch (reason) {
+      toast.error('应用安装失败', {
+        description: reason instanceof Error ? reason.message : '请通过浏览器菜单重试',
       })
     }
   }

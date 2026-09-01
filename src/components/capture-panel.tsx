@@ -39,7 +39,7 @@ export function CapturePanel({
   const Icon = mode === 'id-card' ? CreditCard : mode === 'passport' ? Plane : FileImage
 
   const receive = (list: FileList | null) => {
-    if (!list?.length) return
+    if (busy || !list?.length) return
     const files = Array.from(list).filter(
       (file) => file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name),
     )
@@ -72,6 +72,7 @@ export function CapturePanel({
             <button
               key={layout}
               type="button"
+              disabled={busy}
               onClick={() => onPassportLayoutChange(layout)}
               className={cn(
                 'h-9 rounded-lg text-xs font-semibold text-muted-foreground transition',
@@ -99,6 +100,7 @@ export function CapturePanel({
         onDrop={(event) => {
           event.preventDefault()
           setDragging(false)
+          if (busy) return
           receive(event.dataTransfer.files)
         }}
       >
@@ -143,6 +145,7 @@ export function CapturePanel({
       <input
         ref={cameraInput}
         hidden
+        disabled={busy}
         type="file"
         accept="image/*"
         capture="environment"
@@ -154,6 +157,7 @@ export function CapturePanel({
       <input
         ref={uploadInput}
         hidden
+        disabled={busy}
         type="file"
         accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
         multiple={mode === 'document'}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { db, getProjectPageSummary } from '@/lib/db'
 import type { ScanProject } from '@/lib/types'
 
@@ -44,13 +45,21 @@ export function useProjectSummaries(limit?: number) {
           thumbnailUrl: thumbnail ? URL.createObjectURL(thumbnail) : undefined,
         })),
       )
+    } catch (reason) {
+      if (loadVersion !== loadVersionRef.current) return
+      throw reason
     } finally {
       if (loadVersion === loadVersionRef.current) setLoading(false)
     }
   }, [limit, replaceSummaries])
 
   useEffect(() => {
-    void load().catch(() => undefined)
+    void load().catch((reason: unknown) => {
+      toast.error('扫描记录读取失败', {
+        id: 'project-summaries-load-error',
+        description: reason instanceof Error ? reason.message : '浏览器无法读取本地存储',
+      })
+    })
     return () => {
       loadVersionRef.current += 1
       revokeThumbnailUrls(summariesRef.current)

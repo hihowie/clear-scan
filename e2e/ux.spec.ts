@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
+import { waitForScannerReady } from './helpers'
 
 const documentFixture = fs.readFileSync(path.resolve('e2e/fixtures/document.png'))
 
@@ -113,6 +114,7 @@ test('desktop and mobile shells expose useful empty, install, and fallback state
   }
 
   await page.goto('/#/scan/document')
+  await waitForScannerReady(page)
   await page
     .locator('input[type="file"]')
     .nth(1)
@@ -142,6 +144,7 @@ test('scan editing stays reachable and survives rapid page changes on desktop an
   page,
 }, testInfo) => {
   await page.goto('/#/scan/document')
+  await waitForScannerReady(page)
   await page
     .locator('input[type="file"]')
     .nth(1)

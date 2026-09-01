@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { expect, test } from '@playwright/test'
+import { waitForScannerReady } from './helpers'
 
 test('home page exposes all three scan modes', async ({ page }) => {
   await page.goto('/')
@@ -44,9 +45,50 @@ test('local OpenCV asset initializes inside a classic worker', async ({ page }) 
   expect(state.cvType).toBe('object')
 })
 
+test('shows progress while the image engine loads for the first time', async ({ page }) => {
+  let releaseOpenCv!: () => void
+  const openCvGate = new Promise<void>((resolve) => {
+    releaseOpenCv = resolve
+  })
+  await page.route('**/vendor/opencv.js', async (route) => {
+    await openCvGate
+    await route.continue()
+  })
+
+  await page.goto('/#/scan/document')
+  await expect(page.getByText('首次加载图像引擎')).toBeVisible()
+  await expect(page.getByText('正在下载图像引擎（约 11 MB），可能需要一些时间')).toBeVisible()
+  await expect(page.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow')
+  await expect(page.getByRole('button', { name: '从相册或电脑上传' })).toBeDisabled()
+
+  releaseOpenCv()
+  await expect(page.getByText('首次加载图像引擎')).toBeHidden({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: '从相册或电脑上传' })).toBeEnabled()
+})
+
+test('allows retrying after the image engine fails to load', async ({ page }) => {
+  let failOpenCvRequest = true
+  await page.route('**/vendor/opencv.js', async (route) => {
+    if (failOpenCvRequest) await route.abort('failed')
+    else await route.continue()
+  })
+
+  await page.goto('/#/scan/document')
+  await expect(page.getByText('图像引擎加载失败')).toBeVisible()
+  await expect(page.getByText(/请检查网络后重试/)).toBeVisible()
+
+  failOpenCvRequest = false
+  await page.getByRole('button', { name: '重新加载' }).click()
+
+  await expect(page.getByText('首次加载图像引擎')).toBeHidden({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: '从相册或电脑上传' })).toBeEnabled()
+  await expect(page.getByText('图像引擎加载失败')).toBeHidden()
+})
+
 test('uploads a document and reaches the crop editor', async ({ page }, testInfo) => {
   await page.goto('/#/scan/document')
   await expect(page.getByRole('heading', { name: '添加文档页面' })).toBeVisible()
+  await waitForScannerReady(page)
   const upload = page.locator('input[type="file"]').nth(1)
   await upload.setInputFiles(path.resolve('e2e/fixtures/document.png'))
   await expect(page.getByText('确认四个角点')).toBeVisible({
@@ -193,9 +235,28 @@ test('uploads a document and reaches the crop editor', async ({ page }, testInfo
   }
 })
 
+test('shows progress while document edges are re-detected', async ({ page }) => {
+  await page.goto('/#/scan/document')
+  await waitForScannerReady(page)
+  await page
+    .locator('input[type="file"]')
+    .nth(1)
+    .setInputFiles(path.resolve('e2e/fixtures/document.png'))
+  await expect(page.getByText('确认四个角点')).toBeVisible({ timeout: 120_000 })
+
+  const confirmCrop = page.getByRole('button', { name: '确认裁剪' })
+  await page.getByRole('button', { name: '重新识别' }).click()
+
+  await expect(page.getByText('正在重新识别边缘')).toBeVisible()
+  await expect(confirmCrop).toBeDisabled()
+  await expect(page.getByText('已重新识别边缘')).toBeVisible({ timeout: 30_000 })
+  await expect(confirmCrop).toBeEnabled()
+})
+
 test('scan history can clear all local projects', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'One storage cleanup run is enough')
   await page.goto('/#/scan/document')
+  await waitForScannerReady(page)
   await page
     .locator('input[type="file"]')
     .nth(1)
