@@ -24,7 +24,10 @@ export function PwaLifecycle() {
   } = useRegisterSW()
 
   useEffect(() => {
-    if (offlineReady) toast.success('离线扫描已就绪')
+    if (offlineReady)
+      toast.success('应用界面已可离线打开', {
+        description: '图像引擎会在首次扫描时单独缓存。',
+      })
   }, [offlineReady])
 
   useEffect(() => {

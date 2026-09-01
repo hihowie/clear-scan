@@ -11,11 +11,12 @@ import {
   Sparkles,
   WifiOff,
 } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ProjectCard } from '@/components/project-card'
+import { useScannerNavigation } from '@/hooks/use-scanner-navigation'
 import { useProjectSummaries } from '@/hooks/use-projects'
 import type { ScanMode } from '@/lib/types'
 
@@ -54,7 +55,7 @@ const modes: Array<{
 ]
 
 export function HomePage() {
-  const navigate = useNavigate()
+  const openScanner = useScannerNavigation()
   const { summaries, loading } = useProjectSummaries(4)
 
   return (
@@ -73,7 +74,7 @@ export function HomePage() {
             自动寻找文档边缘、校正透视、抑制反光。身份证、护照和多页文档，都在你的设备上完成处理。
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Button size="lg" onClick={() => navigate('/scan/document')}>
+            <Button size="lg" onClick={() => openScanner('/scan/document')}>
               <ScanLine className="size-5" /> 开始扫描
             </Button>
             <Button
@@ -159,7 +160,7 @@ export function HomePage() {
             <button
               key={mode.mode}
               type="button"
-              onClick={() => navigate(`/scan/${mode.mode}`)}
+              onClick={() => openScanner(`/scan/${mode.mode}`)}
               className="group text-left"
             >
               <Card className="h-full overflow-hidden p-2 transition duration-200 group-hover:-translate-y-1 group-hover:border-primary/25 group-hover:shadow-[0_20px_50px_rgba(18,59,42,.09)]">

@@ -1,4 +1,5 @@
 import scannerWorkerUrl from '../workers/scanner.worker.ts?worker&url'
+import { ENGINE_CACHE_NAME, getOpenCvUrl } from './engine-cache'
 import type {
   PassportLayout,
   RenderOptions,
@@ -131,15 +132,43 @@ export class ScannerClient {
 
   private getWorker() {
     if (this.worker) return this.worker
-    const openCvUrl = new URL(`${import.meta.env.BASE_URL}vendor/opencv.js`, window.location.origin)
-      .href
+    const openCvUrl = getOpenCvUrl()
     const moduleUrl = new URL(scannerWorkerUrl, window.location.origin).href
     const bootstrap = `
       const queuedMessages=[];
       const holdMessage=(event)=>queuedMessages.push(event.data);
       self.addEventListener('message',holdMessage);
-      importScripts(${JSON.stringify(openCvUrl)});
-      import(${JSON.stringify(moduleUrl)}).then(()=>{
+      const openCvUrl=${JSON.stringify(openCvUrl)};
+      const engineCacheName=${JSON.stringify(ENGINE_CACHE_NAME)};
+      const loadOpenCv=async()=>{
+        let cache;
+        if('caches' in self){
+          try{cache=await caches.open(engineCacheName)}catch{}
+        }
+        let response;
+        if(cache){
+          try{response=await cache.match(openCvUrl)}catch{}
+        }
+        let cacheWrite=Promise.resolve();
+        if(!response){
+          response=await fetch(openCvUrl);
+          if(!response.ok)throw new Error('图像引擎下载失败（HTTP '+response.status+'）');
+          if(cache)cacheWrite=cache.put(openCvUrl,response.clone()).catch(()=>undefined);
+        }
+        const source=await response.blob();
+        const sourceUrl=URL.createObjectURL(source);
+        try{
+          importScripts(sourceUrl);
+          await cacheWrite;
+        }catch(error){
+          await cacheWrite;
+          if(cache){try{await cache.delete(openCvUrl)}catch{}}
+          throw error;
+        }finally{
+          URL.revokeObjectURL(sourceUrl);
+        }
+      };
+      loadOpenCv().then(()=>import(${JSON.stringify(moduleUrl)})).then(()=>{
         self.removeEventListener('message',holdMessage);
         queuedMessages.forEach((data)=>self.dispatchEvent(new MessageEvent('message',{data})));
       }).catch((error)=>setTimeout(()=>{throw error}));

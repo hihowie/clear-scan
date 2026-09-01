@@ -1,9 +1,14 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { Code2, FolderClock, Home, ScanLine } from 'lucide-react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { BrandLogo } from './brand-logo'
 import { InstallButton, OnlineBadge, PwaLifecycle } from './pwa-controls'
+import { RouteLoadingOverlay } from './route-loading-overlay'
 import { Button } from '@/components/ui/button'
+import { ScannerNavigationContext } from '@/hooks/use-scanner-navigation'
+import { hasCachedEngineAsset } from '@/lib/engine-cache'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -13,8 +18,27 @@ const navItems = [
 
 export function AppShell() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const [scannerOpening, setScannerOpening] = useState(false)
+  const scannerNavigationRef = useRef(0)
   const scannerRoute =
     location.pathname.startsWith('/scan/') || location.pathname.startsWith('/project/')
+  const openScanner = useCallback(
+    (path: string) => {
+      const navigation = ++scannerNavigationRef.current
+      void hasCachedEngineAsset().then((cached) => {
+        if (cached || scannerNavigationRef.current !== navigation) return
+        flushSync(() => setScannerOpening(true))
+      })
+      navigate(path)
+    },
+    [navigate],
+  )
+
+  useEffect(() => {
+    scannerNavigationRef.current += 1
+    setScannerOpening(false)
+  }, [location.key])
 
   return (
     <div className="min-h-svh">
@@ -73,7 +97,9 @@ export function AppShell() {
       </header>
 
       <main className={cn(scannerRoute ? 'w-full' : 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8')}>
-        <Outlet />
+        <ScannerNavigationContext.Provider value={openScanner}>
+          <Outlet />
+        </ScannerNavigationContext.Provider>
       </main>
 
       <nav
@@ -95,6 +121,10 @@ export function AppShell() {
         </NavLink>
         <NavLink
           to="/scan/document"
+          onClick={(event) => {
+            event.preventDefault()
+            openScanner('/scan/document')
+          }}
           className="absolute left-1/2 top-0 flex -translate-x-1/2 -translate-y-5 flex-col items-center gap-1 text-[10px] font-semibold text-primary"
         >
           <span className="grid size-12 place-items-center rounded-2xl bg-primary text-white shadow-[0_8px_24px_rgba(8,127,91,.28)]">
@@ -116,6 +146,7 @@ export function AppShell() {
         </NavLink>
       </nav>
       <Toaster position="top-center" richColors closeButton />
+      {scannerOpening && <RouteLoadingOverlay scanner />}
     </div>
   )
 }

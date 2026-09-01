@@ -1,11 +1,11 @@
 import { cn } from '@/lib/utils'
 
 export function Progress({
-  value,
+  value = 0,
   indeterminate = false,
   className,
 }: {
-  value: number
+  value?: number
   indeterminate?: boolean
   className?: string
 }) {

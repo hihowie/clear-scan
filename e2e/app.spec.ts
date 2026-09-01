@@ -10,6 +10,26 @@ test('home page exposes all three scan modes', async ({ page }) => {
   await expect(page.getByText('文档扫描', { exact: true })).toBeVisible()
 })
 
+test('shows immediate feedback while the scan page bundle is still loading', async ({ page }) => {
+  let releaseScanPage!: () => void
+  const scanPageGate = new Promise<void>((resolve) => {
+    releaseScanPage = resolve
+  })
+  await page.route(/\/src\/pages\/scan-page\.tsx(?:\?|$)/, async (route) => {
+    await scanPageGate
+    await route.continue()
+  })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: '开始扫描' }).click()
+
+  await expect(page).toHaveURL(/#\/scan\/document$/)
+  await expect(page.getByRole('status').getByText('正在打开扫描页面')).toBeVisible()
+
+  releaseScanPage()
+  await expect(page.getByText('首次加载图像引擎')).toBeVisible()
+})
+
 test('local OpenCV asset initializes inside a classic worker', async ({ page }) => {
   await page.goto('/')
   const state = await page.evaluate(
@@ -64,6 +84,32 @@ test('shows progress while the image engine loads for the first time', async ({ 
   releaseOpenCv()
   await expect(page.getByText('首次加载图像引擎')).toBeHidden({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: '从相册或电脑上传' })).toBeEnabled()
+})
+
+test('reuses the cached image engine without showing a reload overlay', async ({ page }) => {
+  let openCvRequests = 0
+  await page.route('**/vendor/opencv.js', async (route) => {
+    openCvRequests += 1
+    await route.continue()
+  })
+
+  await page.goto('/#/scan/document')
+  await waitForScannerReady(page)
+  expect(openCvRequests).toBe(1)
+
+  await page.reload()
+  await page.waitForTimeout(800)
+  await expect(page.getByText('正在打开扫描页面')).toBeHidden()
+  await expect(page.getByText('首次加载图像引擎')).toBeHidden()
+  await waitForScannerReady(page)
+  await expect(page.getByText('首次加载图像引擎')).toBeHidden()
+  expect(openCvRequests).toBe(1)
+
+  await page.getByRole('link', { name: '清晰扫描首页' }).click()
+  await page.getByRole('button', { name: '开始扫描' }).click()
+  await expect(page).toHaveURL(/#\/scan\/document$/)
+  await expect(page.getByText('正在打开扫描页面')).toBeHidden()
+  await expect(page.getByText('首次加载图像引擎')).toBeHidden()
 })
 
 test('allows retrying after the image engine fails to load', async ({ page }) => {
@@ -147,29 +193,26 @@ test('uploads a document and reaches the crop editor', async ({ page }, testInfo
   await expect(page.getByText('调整扫描效果')).toBeVisible({
     timeout: 120_000,
   })
-  const workspace = page.locator('section.paper-grid')
   const loading = page.getByRole('status')
   await expect(loading).toBeVisible()
-  const [workspaceBox, loadingContentBox] = await Promise.all([
-    workspace.boundingBox(),
-    loading.locator(':scope > div').boundingBox(),
-  ])
-  expect(workspaceBox).not.toBeNull()
-  expect(loadingContentBox).not.toBeNull()
-  expect(
-    Math.abs(
-      loadingContentBox!.x +
-        loadingContentBox!.width / 2 -
-        (workspaceBox!.x + workspaceBox!.width / 2),
-    ),
-  ).toBeLessThanOrEqual(1)
-  expect(
-    Math.abs(
-      loadingContentBox!.y +
-        loadingContentBox!.height / 2 -
-        (workspaceBox!.y + workspaceBox!.height / 2),
-    ),
-  ).toBeLessThanOrEqual(1)
+  await expect
+    .poll(() =>
+      loading.evaluate((element) => {
+        const workspaceElement = element.closest('section')
+        const content = element.firstElementChild
+        if (!workspaceElement || !content) return Number.POSITIVE_INFINITY
+        const workspaceBox = workspaceElement.getBoundingClientRect()
+        const contentBox = content.getBoundingClientRect()
+        const horizontalOffset = Math.abs(
+          contentBox.x + contentBox.width / 2 - (workspaceBox.x + workspaceBox.width / 2),
+        )
+        const verticalOffset = Math.abs(
+          contentBox.y + contentBox.height / 2 - (workspaceBox.y + workspaceBox.height / 2),
+        )
+        return Math.max(horizontalOffset, verticalOffset)
+      }),
+    )
+    .toBeLessThanOrEqual(1)
   await expect(page.getByRole('img', { name: '扫描增强预览' })).toBeVisible({
     timeout: 120_000,
   })

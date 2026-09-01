@@ -65,6 +65,7 @@ export default defineConfig({
       },
       workbox: {
         cleanupOutdatedCaches: true,
+        globIgnores: ['**/vendor/opencv.js'],
         navigateFallback: 'index.html',
         maximumFileSizeToCacheInBytes: 20 * 1024 * 1024,
       },

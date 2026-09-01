@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { TriangleAlert } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
@@ -13,6 +14,7 @@ import {
   ScanStageNavigation,
   type ScanStage,
 } from '@/components/scan-page-view'
+import { Button } from '@/components/ui/button'
 import { useScanPersistence } from '@/hooks/use-scan-persistence'
 import { useScanPreview } from '@/hooks/use-scan-preview'
 import {
@@ -24,6 +26,7 @@ import {
   updatePageWithThumbnail,
 } from '@/lib/db'
 import { DEFAULT_QUAD } from '@/lib/geometry'
+import { hasCachedEngineAsset } from '@/lib/engine-cache'
 import {
   ENGINE_DOWNLOAD_LABEL,
   ENGINE_TIMEOUT_MESSAGE,
@@ -49,6 +52,13 @@ import { createId, modeDefaultName } from '@/lib/utils'
 
 function isScanMode(value?: string): value is ScanMode {
   return value === 'id-card' || value === 'passport' || value === 'document'
+}
+
+const MINIMUM_ENGINE_LOADING_DISPLAY_MS = 600
+
+interface EngineLoadError {
+  title: string
+  description: string
 }
 
 function nextPageRole(mode: ScanMode, pages: ScanPageModel[]): PageRole {
@@ -90,9 +100,12 @@ export function ScanPage() {
   const [processingTitle, setProcessingTitle] = useState('正在处理照片')
   const [processingLabel, setProcessingLabel] = useState('正在准备照片')
   const [engineLoading, setEngineLoading] = useState(() => !scannerClient.isReady)
+  const [showEngineLoading, setShowEngineLoading] = useState(false)
   const [engineLabel, setEngineLabel] = useState(
     scannerClient.isReady ? '图像引擎已就绪' : ENGINE_DOWNLOAD_LABEL,
   )
+  const [engineLoadAttempt, setEngineLoadAttempt] = useState(0)
+  const [engineLoadError, setEngineLoadError] = useState<EngineLoadError>()
   const [pendingDelete, setPendingDelete] = useState<ScanPageModel>()
   const [deletingPage, setDeletingPage] = useState(false)
   const [sourceUrl, setSourceUrl] = useState<string>()
@@ -139,10 +152,18 @@ export function ScanPage() {
   useEffect(() => {
     if (scannerClient.isReady) return
     let cancelled = false
+    let finished = false
     const loadEngine = () => {
       if (cancelled) return
+      const startedAt = performance.now()
+      setEngineLoadError(undefined)
       setEngineLoading(true)
+      setShowEngineLoading(false)
       setEngineLabel(ENGINE_DOWNLOAD_LABEL)
+      const cachedAsset = hasCachedEngineAsset()
+      void cachedAsset.then((cached) => {
+        if (!cancelled && !finished) setShowEngineLoading(!cached)
+      })
       void scannerClient
         .prewarm({
           onProgress: (_progress, label) => {
@@ -150,28 +171,33 @@ export function ScanPage() {
             setEngineLabel(label)
           },
         })
-        .then(() => {
+        .then(async () => {
+          finished = true
+          if (!(await cachedAsset)) {
+            const remaining = MINIMUM_ENGINE_LOADING_DISPLAY_MS - (performance.now() - startedAt)
+            if (remaining > 0)
+              await new Promise<void>((resolve) => window.setTimeout(resolve, remaining))
+          }
           if (cancelled) return
           toast.dismiss('engine-loading-error')
+          setEngineLoadError(undefined)
           setEngineLabel('图像引擎已就绪')
+          setShowEngineLoading(false)
           setEngineLoading(false)
         })
         .catch((reason: unknown) => {
           if (cancelled) return
+          finished = true
+          setShowEngineLoading(false)
           setEngineLoading(false)
           const timedOut = reason instanceof Error && reason.message === ENGINE_TIMEOUT_MESSAGE
-          toast.error(timedOut ? ENGINE_TIMEOUT_MESSAGE : '图像引擎加载失败', {
-            id: 'engine-loading-error',
+          setEngineLoadError({
+            title: timedOut ? ENGINE_TIMEOUT_MESSAGE : '图像引擎加载失败',
             description: timedOut
               ? '请检查网络后重试'
               : reason instanceof Error
                 ? `${reason.message}，请检查网络后重试`
                 : '请检查网络后重试',
-            action: {
-              label: '重新加载',
-              onClick: loadEngine,
-            },
-            duration: Infinity,
           })
         })
     }
@@ -180,7 +206,15 @@ export function ScanPage() {
       cancelled = true
       toast.dismiss('engine-loading-error')
     }
-  }, [])
+  }, [engineLoadAttempt])
+
+  const retryEngine = () => {
+    setEngineLoadError(undefined)
+    setEngineLoading(true)
+    setShowEngineLoading(false)
+    setEngineLabel(ENGINE_DOWNLOAD_LABEL)
+    setEngineLoadAttempt((current) => current + 1)
+  }
 
   useEffect(
     () => () => {
@@ -720,12 +754,31 @@ export function ScanPage() {
         onConfirm={() => void deletePage()}
       />
       <ScanProcessingOverlay
-        open={engineLoading || busy}
+        open={showEngineLoading || busy}
         progress={processingProgress}
-        indeterminate={engineLoading || processingIndeterminate}
-        title={engineLoading ? '首次加载图像引擎' : processingTitle}
-        label={engineLoading ? engineLabel : processingLabel}
+        indeterminate={showEngineLoading || processingIndeterminate}
+        title={showEngineLoading ? '首次加载图像引擎' : processingTitle}
+        label={showEngineLoading ? engineLabel : processingLabel}
       />
+      {engineLoadError && (
+        <div
+          className="fixed inset-x-4 top-20 z-50 mx-auto max-w-lg rounded-2xl border border-destructive/25 bg-background p-4 shadow-xl"
+          role="alert"
+        >
+          <div className="flex items-start gap-3">
+            <TriangleAlert className="mt-0.5 size-5 shrink-0 text-destructive" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold">{engineLoadError.title}</p>
+              <p className="mt-1 break-words text-xs leading-5 text-muted-foreground">
+                {engineLoadError.description}
+              </p>
+            </div>
+            <Button size="sm" onClick={retryEngine}>
+              重新加载
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
