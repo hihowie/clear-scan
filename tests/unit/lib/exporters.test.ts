@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { PDFDocument } from 'pdf-lib'
 import { DEFAULT_QUAD } from '@/lib/geometry'
 import { DEFAULT_ADJUSTMENTS, SMART_EFFECTS, type ScanPage, type ScanProject } from '@/lib/types'
 
@@ -11,6 +12,7 @@ vi.mock('@/lib/scanner-client', () => ({
 }))
 
 import { exportProject } from '@/lib/exporters'
+import { makeProject } from '../../support/scan-fixtures'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -130,4 +132,28 @@ describe('ID card image export', () => {
       expect(result.fileName).toBe(`身份证.${format}`)
     },
   )
+})
+
+describe('content-sized PDF export', () => {
+  it.each([
+    [100, 2000, 39.6, 792],
+    [2000, 100, 792, 39.6],
+    [20, 40, 20, 40],
+  ])('preserves the aspect ratio of a %ix%i page', async (width, height, pdfWidth, pdfHeight) => {
+    renderMock.mockReset()
+    // A valid PNG keeps PDF embedding and serialization in the regression test.
+    const png = new Uint8Array(
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2n9sAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    )
+    renderMock.mockResolvedValue({ blob: new Blob([png], { type: 'image/png' }), width, height })
+    const result = await exportProject(makeProject(), [makePage('page-1', 0)], 'pdf', 'content')
+    const pdf = await PDFDocument.load(await result.blob.arrayBuffer())
+    const size = pdf.getPages()[0].getSize()
+    expect(size.width).toBeCloseTo(pdfWidth)
+    expect(size.height).toBeCloseTo(pdfHeight)
+    expect(size.width / size.height).toBeCloseTo(width / height)
+  })
 })

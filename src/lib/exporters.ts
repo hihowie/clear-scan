@@ -117,8 +117,8 @@ async function createPdf(renderedPages: RenderedPage[], layout: PdfLayout, force
     } else {
       const maxSide = 792
       const scale = Math.min(1, maxSide / Math.max(rendered.width, rendered.height))
-      const width = Math.max(72, rendered.width * scale)
-      const height = Math.max(72, rendered.height * scale)
+      const width = rendered.width * scale
+      const height = rendered.height * scale
       const page = pdf.addPage([width, height])
       page.drawImage(image, { x: 0, y: 0, width, height })
     }

@@ -64,6 +64,58 @@ afterEach(async () => {
 })
 
 describe('scan page persistence', () => {
+  it('keeps edits and the new order when reordering finishes after further editing', async () => {
+    await repository.putPage(makePage({ id: 'page-2', order: 1 }))
+    renderScanner()
+    await screen.findByRole('button', { name: '灰度' })
+    const gate = holdNextPageWrite()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: '第 1 页后移' }))
+      await waitFor(() => expect(gate.writes).toHaveBeenCalled())
+      fireEvent.click(screen.getByRole('button', { name: '灰度' }))
+      fireEvent.click(screen.getByRole('button', { name: '顺时针旋转 90°' }))
+    } finally {
+      await act(async () => gate.release())
+    }
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '打开第 2 页' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      ),
+    )
+    expect(screen.getByRole('button', { name: '灰度' })).toHaveAttribute('aria-pressed', 'true')
+    expect((await repository.getProjectPages('project-1'))[1]).toMatchObject({
+      id: 'page-1',
+      order: 1,
+      rotation: 90,
+      effects: { color: 'grayscale' },
+    })
+  })
+
+  it('does not restore old pages when reordering finishes after navigation', async () => {
+    await repository.putPage(makePage({ id: 'page-2', order: 1 }))
+    renderScanner()
+    await screen.findByRole('button', { name: '灰度' })
+    const gate = holdNextPageWrite()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: '第 1 页后移' }))
+      await waitFor(() => expect(gate.writes).toHaveBeenCalled())
+      fireEvent.click(screen.getByRole('link', { name: '扫一扫' }))
+      await screen.findByRole('heading', { name: '添加文档页面' })
+    } finally {
+      await act(async () => gate.release())
+    }
+    await act(async () => {
+      await repository.getProjectPages('project-1')
+    })
+    expect(screen.queryByRole('button', { name: '打开第 1 页' })).not.toBeInTheDocument()
+    expect((await repository.getProjectPages('project-1')).map((page) => page.id)).toEqual([
+      'page-2',
+      'page-1',
+    ])
+  })
+
   it.each(['首页', '扫描记录'])(
     'keeps edits when reopening from %s before the previous component finishes saving',
     async (destination) => {
@@ -98,7 +150,7 @@ describe('scan page persistence', () => {
       )
       await waitFor(() => expect(metadata).toHaveBeenCalledTimes(2), { timeout: 2000 })
       await waitFor(async () => {
-        expect((await repository.db.pages.get('page-1'))?.effects.color).toBe('grayscale')
+        expect((await repository.db.pages.get('page-1'))?.effects?.color).toBe('grayscale')
       })
     },
   )
@@ -128,14 +180,14 @@ describe('scan page persistence', () => {
         const project = (await repository.db.projects.get('project-1'))!
         expect(project.updatedAt).toBeGreaterThan(recent)
         expect(within(cards[0]).getByText(formatDate(project.updatedAt))).toBeInTheDocument()
-        expect((await repository.db.pages.get('page-1'))?.effects.color).toBe('enhanced-color')
+        expect((await repository.db.pages.get('page-1'))?.effects?.color).toBe('enhanced-color')
       } finally {
         await act(async () => {
           release()
         })
       }
       await waitFor(async () => {
-        expect((await repository.db.pages.get('page-1'))?.effects.color).toBe('black-white')
+        expect((await repository.db.pages.get('page-1'))?.effects?.color).toBe('black-white')
       })
     },
   )
@@ -215,7 +267,7 @@ describe('scan page persistence', () => {
     )
   })
 
-  it('preserves newer autosaves even when the manual write exceeds the debounce interval', async () => {
+  it('submits newer edits immediately while a manual metadata write is pending', async () => {
     const { release } = holdNextPageWrite()
     const metadata = vi.spyOn(repository, 'updatePageMetadata')
     const savedToast = vi.spyOn(toast, 'success')

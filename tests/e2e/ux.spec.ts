@@ -35,6 +35,33 @@ async function storedPageState(page: Page, sourceName: string) {
   }, sourceName)
 }
 
+async function seedEditableProject(page: Page, legacy = false) {
+  await page.goto('/')
+  await page.evaluate(
+    async ({ bytes, legacy }) => {
+      const dbPath = '/src/lib/db.ts'
+      const fixturePath = '/tests/support/scan-fixtures.ts'
+      const { db, putPage } = await import(dbPath)
+      const { makePage, makeProject } = await import(fixturePath)
+      const source = new Blob([new Uint8Array(bytes)], { type: 'image/png' })
+      const bitmap = await createImageBitmap(source)
+      await db.projects.put(makeProject())
+      await putPage(makePage({ source, width: bitmap.width, height: bitmap.height }))
+      bitmap.close()
+      if (legacy) {
+        await db.pages.update('page-1', {
+          effects: undefined,
+          filter: 'grayscale',
+          cropConfirmed: undefined,
+          cornerSource: undefined,
+        })
+      }
+    },
+    { bytes: Array.from(documentFixture), legacy },
+  )
+  await page.goto('/#/project/project-1')
+}
+
 test('desktop and mobile shells expose useful empty, install, and fallback states', async ({
   page,
 }, testInfo) => {
@@ -288,14 +315,16 @@ test('scan editing stays reachable and survives rapid page changes on desktop an
     await expect(grayscale).toHaveAttribute('aria-pressed', 'true')
     await page.getByRole('link', { name: '首页', exact: true }).click()
     await expect(page.getByRole('heading', { name: /清晰扫描仪/ })).toBeVisible()
-    // Reopen through the SPA while the previous mount still has queued writes.
-    // A full page.goto() would discard that queue and miss the regression.
+    // Reopen while thumbnail encoding is pending. Metadata must already be
+    // available without waiting for the old component's thumbnail queue.
     await page
       .locator(`a[href="${new URL(projectUrl).hash}"]`)
       .filter({ has: page.getByRole('heading') })
       .click()
-    await expect(page.getByRole('status').getByText('正在打开扫描项目…')).toBeVisible()
-    await expect(page.getByRole('button', { name: '灰度', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '灰度', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
   } finally {
     await thumbnailSave.release()
   }
@@ -360,4 +389,44 @@ test('scan editing stays reachable and survives rapid page changes on desktop an
       .poll(async () => (await storedPageState(page, 'page-one.png')).color)
       .toBe('black-white')
   }
+})
+
+test.describe('project persistence across browser navigation', () => {
+  for (const pendingThumbnail of [false, true]) {
+    test(`keeps an immediate edit across reload with pending thumbnail: ${pendingThumbnail}`, async ({
+      page,
+    }) => {
+      await seedEditableProject(page)
+      await expect(page.getByRole('button', { name: '保存页面' })).toBeEnabled()
+      if (pendingThumbnail) {
+        const thumbnailSave = await holdNextThumbnailEncoding(page)
+        await page.getByRole('button', { name: '保存页面' }).click()
+        await thumbnailSave.waitUntilBlocked()
+        // Reload intentionally discards this document and its pending encoder.
+      }
+      await page.getByRole('button', { name: '灰度', exact: true }).click()
+      await page.reload()
+      await expect(page.getByRole('button', { name: '灰度', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+      expect((await storedPageState(page, 'page.png')).color).toBe('grayscale')
+    })
+  }
+
+  test('opens a legacy project and preserves its filter after crop confirmation', async ({
+    page,
+  }) => {
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    await seedEditableProject(page, true)
+    const confirmCrop = page.getByRole('button', { name: '确认裁剪' })
+    await expect(confirmCrop).toBeEnabled()
+    await confirmCrop.click()
+    await expect(page.getByRole('button', { name: '灰度', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(errors).toEqual([])
+  })
 })

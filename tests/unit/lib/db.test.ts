@@ -17,6 +17,7 @@ import { holdNextPageWrite, holdThumbnailEncoding } from '../../support/persiste
 import {
   DEFAULT_ADJUSTMENTS,
   DEFAULT_WHITENING_STRENGTH,
+  ORIGINAL_EFFECTS,
   SMART_EFFECTS,
   type EnhancementSettings,
   type ScanPage,
@@ -31,7 +32,7 @@ afterEach(async () => {
 describe('local scan repository', () => {
   describe('project reads during queued writes', () => {
     it.each(['pages', 'project'] as const)(
-      'loads current %s data after all its page queues finish',
+      'loads current %s metadata without waiting for thumbnail encoding',
       async (kind) => {
         const firstPage = makePage()
         const secondPage = makePage({ id: 'page-2', order: 1 })
@@ -42,23 +43,15 @@ describe('local scan repository', () => {
         const first = updatePageWithThumbnail(firstPage, firstGate.blob)
         const edited = updatePageMetadata({ ...firstPage, rotation: 90 })
         const second = updatePageWithThumbnail({ ...secondPage, rotation: 180 }, secondGate.blob)
-        const received = vi.fn()
-        const reading = (
+        const reading =
           kind === 'pages'
             ? getProjectPages(firstPage.projectId)
             : getProjectWithPages(firstPage.projectId).then(({ pages }) => pages)
-        ).then((pages) => {
-          received()
-          return pages
-        })
         try {
           await vi.waitFor(() => expect(secondGate.encoding).toHaveBeenCalled())
-          firstGate.release()
-          await Promise.all([first, edited])
-          expect(received).not.toHaveBeenCalled()
-          secondGate.release()
           const pages = await reading
           expect(pages.map((page) => page.rotation)).toEqual([90, 180])
+          expect(pages.every((page) => page.thumbnail === undefined)).toBe(true)
         } finally {
           firstGate.release()
           secondGate.release()
@@ -71,20 +64,20 @@ describe('local scan repository', () => {
       const page = makePage()
       await db.projects.put(makeProject())
       await bulkPutPages([page])
-      const firstGate = holdThumbnailEncoding()
-      const lastGate = holdThumbnailEncoding()
-      const first = updatePageWithThumbnail(page, firstGate.blob)
+      const gate = holdNextPageWrite()
+      const first = updatePageMetadata({ ...page, rotation: 90 })
       const reading = getProjectWithPages(page.projectId)
-      const last = updatePageWithThumbnail({ ...page, rotation: 270 }, lastGate.blob)
+      const received = vi.fn()
+      void reading.then(received)
+      let last: Promise<unknown> | undefined
       try {
-        await vi.waitFor(() => expect(firstGate.encoding).toHaveBeenCalled())
-        firstGate.release()
-        await vi.waitFor(() => expect(lastGate.encoding).toHaveBeenCalled())
-        lastGate.release()
+        await vi.waitFor(() => expect(gate.writes).toHaveBeenCalled())
+        expect(received).not.toHaveBeenCalled()
+        last = updatePageMetadata({ ...page, rotation: 270 })
+        gate.release()
         expect((await reading).pages[0].rotation).toBe(270)
       } finally {
-        firstGate.release()
-        lastGate.release()
+        gate.release()
         await Promise.allSettled([first, last, reading])
       }
     })
@@ -133,11 +126,11 @@ describe('local scan repository', () => {
       const page = makePage()
       await db.projects.put(makeProject())
       await bulkPutPages([page])
-      const gate = holdThumbnailEncoding()
-      const writing = updatePageWithThumbnail(page, gate.blob)
+      const gate = holdNextPageWrite()
+      const writing = updatePageMetadata(page)
       const reading = getProjectWithPages(page.projectId)
       try {
-        await vi.waitFor(() => expect(gate.encoding).toHaveBeenCalled())
+        await vi.waitFor(() => expect(gate.writes).toHaveBeenCalled())
         await deleteProject(page.projectId)
         gate.release()
         expect(await reading).toEqual({ project: undefined, pages: [] })
@@ -188,7 +181,7 @@ describe('local scan repository', () => {
     )
   })
 
-  it('orders thumbnail encoding before newer metadata and recovers after a failed write', async () => {
+  it('commits edits during thumbnail encoding and recovers after a failed metadata write', async () => {
     const page = makePage()
     await db.projects.put(makeProject())
     await bulkPutPages([page])
@@ -197,6 +190,8 @@ describe('local scan repository', () => {
     const second = updatePageMetadata({ ...page, rotation: 90, updatedAt: 2 })
     try {
       await vi.waitFor(() => expect(encoding).toHaveBeenCalled())
+      await second
+      expect((await db.pages.get(page.id))?.rotation).toBe(90)
     } finally {
       release()
       await Promise.all([first, second])
@@ -212,6 +207,68 @@ describe('local scan repository', () => {
     await expect(failed).rejects.toThrow('temporary write failure')
     await recovered
     expect((await getProjectWithPages(page.projectId)).pages[0].rotation).toBe(270)
+  })
+
+  it('keeps thumbnails in save order without delaying newer metadata', async () => {
+    const page = makePage()
+    await bulkPutPages([page])
+    const gate = holdThumbnailEncoding()
+    const first = updatePageWithThumbnail(page, gate.blob)
+    const last = updatePageWithThumbnail({ ...page, rotation: 90 }, new Blob(['latest']))
+    try {
+      expect((await getProjectPages(page.projectId))[0].rotation).toBe(90)
+    } finally {
+      gate.release()
+      await Promise.all([first, last])
+    }
+    const [stored] = await getProjectPages(page.projectId)
+    expect(await stored.thumbnail?.text()).toBe('latest')
+    expect(stored.rotation).toBe(90)
+  })
+
+  describe('legacy page effects', () => {
+    it.each([
+      ['original', ORIGINAL_EFFECTS],
+      ['smart', SMART_EFFECTS],
+      ['deshadow', { ...ORIGINAL_EFFECTS, shadow: 'deshadow' }],
+      ['ai-deshadow', { ...ORIGINAL_EFFECTS, shadow: 'deshadow' }],
+      ['deglare', { ...ORIGINAL_EFFECTS, glare: 'deglare' }],
+      ['grayscale', { ...ORIGINAL_EFFECTS, color: 'grayscale' }],
+      ['black-white', { ...ORIGINAL_EFFECTS, color: 'black-white' }],
+      ['sharpen', { ...ORIGINAL_EFFECTS, detail: 'sharpen' }],
+      ['vivid', { ...ORIGINAL_EFFECTS, color: 'enhanced-color' }],
+    ] as const)('restores the %s preset from records without effects', async (filter, effects) => {
+      const page = makePage()
+      await bulkPutPages([page])
+      await db.pages.update(page.id, { effects: undefined, filter })
+      const [stored] = await getProjectPages(page.projectId)
+      expect(stored.effects).toEqual(effects)
+      expect(stored).not.toHaveProperty('filter')
+      await updatePageMetadata(stored)
+      expect((await db.pages.get(page.id))?.effects).toEqual(effects)
+    })
+
+    it('preserves composed effects ahead of an older preset and replaces retired values', async () => {
+      const page = makePage()
+      await bulkPutPages([page])
+      await db.pages.update(page.id, {
+        filter: 'original',
+        effects: { shadow: 'ai-deshadow', glare: 'deglare', color: 'vivid', detail: 'sharpen' },
+      })
+      expect((await getProjectPages(page.projectId))[0].effects).toEqual({
+        shadow: 'deshadow',
+        glare: 'deglare',
+        color: 'enhanced-color',
+        detail: 'sharpen',
+      })
+    })
+
+    it('uses original effects when a legacy record has neither effects nor a preset', async () => {
+      const page = makePage()
+      await bulkPutPages([page])
+      await db.pages.update(page.id, { effects: undefined })
+      expect((await getProjectPages(page.projectId))[0].effects).toEqual(ORIGINAL_EFFECTS)
+    })
   })
 
   it('stores a project with its ordered pages and deletes them atomically', async () => {

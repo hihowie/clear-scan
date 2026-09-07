@@ -1,17 +1,54 @@
 import Dexie, { type EntityTable } from 'dexie'
-import { DEFAULT_ADJUSTMENTS, type ScanPage, type ScanProject } from './types'
+import {
+  DEFAULT_ADJUSTMENTS,
+  ORIGINAL_EFFECTS,
+  SMART_EFFECTS,
+  type EnhancementEffects,
+  type ScanPage,
+  type ScanProject,
+} from './types'
 
 interface StoredBinary {
   data: ArrayBuffer
   type: string
 }
 
-type StoredScanPage = Omit<ScanPage, 'source' | 'thumbnail'> & {
-  source: StoredBinary
-  thumbnail?: StoredBinary
+type LegacyFilter =
+  | 'original'
+  | 'smart'
+  | 'deshadow'
+  | 'ai-deshadow'
+  | 'deglare'
+  | 'grayscale'
+  | 'black-white'
+  | 'sharpen'
+  | 'vivid'
+
+type StoredEffects = Omit<EnhancementEffects, 'shadow' | 'color'> & {
+  shadow: EnhancementEffects['shadow'] | 'ai-deshadow'
+  color: EnhancementEffects['color'] | 'vivid'
 }
 
-type StoredPageMetadata = Omit<StoredScanPage, 'id' | 'source' | 'thumbnail'>
+type StoredScanPage = Omit<ScanPage, 'source' | 'thumbnail' | 'effects'> & {
+  source: StoredBinary
+  thumbnail?: StoredBinary
+  effects?: StoredEffects
+  filter?: LegacyFilter
+}
+
+type StoredPageMetadata = Omit<StoredScanPage, 'id' | 'source' | 'thumbnail' | 'order' | 'filter'>
+
+const LEGACY_FILTER_EFFECTS: Record<LegacyFilter, EnhancementEffects> = {
+  original: ORIGINAL_EFFECTS,
+  smart: SMART_EFFECTS,
+  deshadow: { ...ORIGINAL_EFFECTS, shadow: 'deshadow' },
+  'ai-deshadow': { ...ORIGINAL_EFFECTS, shadow: 'deshadow' },
+  deglare: { ...ORIGINAL_EFFECTS, glare: 'deglare' },
+  grayscale: { ...ORIGINAL_EFFECTS, color: 'grayscale' },
+  'black-white': { ...ORIGINAL_EFFECTS, color: 'black-white' },
+  sharpen: { ...ORIGINAL_EFFECTS, detail: 'sharpen' },
+  vivid: { ...ORIGINAL_EFFECTS, color: 'enhanced-color' },
+}
 
 class ScannerDatabase extends Dexie {
   projects!: EntityTable<ScanProject, 'id'>
@@ -34,24 +71,27 @@ interface PendingPageWrite {
 }
 
 const pageWrites = new Map<string, PendingPageWrite>()
+const thumbnailWrites = new Map<string, PendingPageWrite>()
 
-function queuePageWrite<T>(page: ScanPage, write: () => Promise<T>): Promise<T> {
-  // Thumbnail encoding and slow writes must finish before newer edits to the
-  // same page, including autosaves and flushes triggered by navigation.
-  const previous = pageWrites.get(page.id)?.promise ?? Promise.resolve()
+function queuePageWrite<T>(
+  page: Pick<ScanPage, 'id' | 'projectId'>,
+  write: () => Promise<T>,
+  queue = pageWrites,
+): Promise<T> {
+  const previous = queue.get(page.id)?.promise ?? Promise.resolve()
   const pending = previous.catch(() => undefined).then(write)
   const entry = { projectId: page.projectId, promise: pending }
-  pageWrites.set(page.id, entry)
+  queue.set(page.id, entry)
   const release = () => {
-    if (pageWrites.get(page.id) === entry) pageWrites.delete(page.id)
+    if (queue.get(page.id) === entry) queue.delete(page.id)
   }
   void pending.then(release, release)
   return pending
 }
 
 async function waitForProjectWrites(projectId: string) {
-  // The queue outlives ScanPage mounts. Editable reads must observe writes
-  // from previous mounts, including saves appended while a read is waiting.
+  // Editable reads wait for metadata from previous mounts, including writes
+  // appended while waiting. Thumbnail encoding never blocks these edits.
   for (;;) {
     const pending = [...pageWrites.values()]
       .filter((entry) => entry.projectId === projectId)
@@ -83,18 +123,35 @@ async function encodePage(page: ScanPage): Promise<StoredScanPage> {
 }
 
 function pageMetadata(page: ScanPage): StoredPageMetadata {
-  const { id: _id, source: _source, thumbnail: _thumbnail, ...metadata } = page
+  // Reordering owns the order field, so an older editor snapshot cannot undo it.
+  const { id: _id, source: _source, thumbnail: _thumbnail, order: _order, ...metadata } = page
   return metadata
 }
 
 function decodePage(page: StoredScanPage): ScanPage {
-  const { source, thumbnail, adjustments, cornerSource, cropConfirmed, ...metadata } = page
+  const {
+    source,
+    thumbnail,
+    adjustments,
+    cornerSource,
+    cropConfirmed,
+    effects,
+    filter,
+    ...metadata
+  } = page
+  const storedEffects = effects ?? (filter ? LEGACY_FILTER_EFFECTS[filter] : ORIGINAL_EFFECTS)
   return {
     ...metadata,
     source: decodeBinary(source),
     thumbnail: thumbnail ? decodeBinary(thumbnail) : undefined,
     cornerSource: cornerSource ?? 'unverified',
     cropConfirmed: cropConfirmed ?? false,
+    // Preserve legacy presets and map retired effects to their supported equivalents.
+    effects: {
+      ...storedEffects,
+      shadow: storedEffects.shadow === 'ai-deshadow' ? 'deshadow' : storedEffects.shadow,
+      color: storedEffects.color === 'vivid' ? 'enhanced-color' : storedEffects.color,
+    },
     adjustments: {
       ...DEFAULT_ADJUSTMENTS,
       ...adjustments,
@@ -118,16 +175,29 @@ export async function updatePageMetadata(page: ScanPage) {
 }
 
 export async function updatePageWithThumbnail(page: ScanPage, thumbnail: Blob) {
-  return queuePageWrite(page, async () => {
-    return db.pages.update(page.id, {
-      ...pageMetadata(page),
-      thumbnail: await encodeBinary(thumbnail),
-    })
-  })
+  // Commit metadata promptly. Slow thumbnail encoding must not delay later
+  // edits or write an old metadata snapshot after they have been saved.
+  const metadataWrite = updatePageMetadata(page)
+  const thumbnailWrite = queuePageWrite(
+    page,
+    async () => {
+      const encoded = await encodeBinary(thumbnail)
+      await metadataWrite
+      return db.pages.update(page.id, { thumbnail: encoded })
+    },
+    thumbnailWrites,
+  )
+  const [, updated] = await Promise.all([metadataWrite, thumbnailWrite])
+  return updated
 }
 
-export async function bulkUpdatePageMetadata(pages: ScanPage[]) {
-  return Promise.all(pages.map(updatePageMetadata))
+export async function bulkUpdatePageOrder(pages: Pick<ScanPage, 'id' | 'projectId' | 'order'>[]) {
+  const updatedAt = Date.now()
+  return Promise.all(
+    pages.map((page) =>
+      queuePageWrite(page, () => db.pages.update(page.id, { order: page.order, updatedAt })),
+    ),
+  )
 }
 
 async function readProjectPages(projectId: string) {

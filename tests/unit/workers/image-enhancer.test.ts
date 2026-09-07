@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { createRequire } from 'node:module'
-import type { CV } from '@techstark/opencv-js'
-import { beforeAll, describe, expect, it } from 'vitest'
+import type { CV, Mat } from '@techstark/opencv-js'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_ADJUSTMENTS, ORIGINAL_EFFECTS, SMART_EFFECTS } from '@/lib/types'
 import {
   createLightingResult,
@@ -10,7 +10,11 @@ import {
 } from '@/workers/image-enhancer'
 
 // This build is a self-resolving thenable; load it without promise assimilation.
-const cv = createRequire(import.meta.url)('@techstark/opencv-js') as CV
+const cv = createRequire(import.meta.url)('@techstark/opencv-js') as CV & {
+  HEAPU8: Uint8Array
+  _malloc: (bytes: number) => number
+  _free: (pointer: number) => void
+}
 
 beforeAll(async () => {
   if (!cv.Mat) {
@@ -96,3 +100,47 @@ describe.each(['original', 'enhanced-color', 'grayscale', 'black-white'] as cons
     })
   },
 )
+
+describe('black-white WASM memory growth', () => {
+  it('preserves paper and ink when normalization allocates a larger heap', () => {
+    const source = new cv.Mat(200, 200, cv.CV_8UC4, new cv.Scalar(230, 230, 230, 255))
+    for (let y = 90; y < 110; y += 1) {
+      for (let x = 90; x < 110; x += 1) {
+        source.data.set([20, 20, 20, 255], (y * source.cols + x) * 4)
+      }
+    }
+    const effects = {
+      ...ORIGINAL_EFFECTS,
+      shadow: 'balance' as const,
+      color: 'black-white' as const,
+    }
+    const adjustments = { ...DEFAULT_ADJUSTMENTS, shadowStrength: 0 }
+    const baseline = processEffects(cv, source, effects, adjustments)
+    const expected = baseline.data.slice()
+    baseline.delete()
+    const heapSize = cv.HEAPU8.buffer.byteLength
+    const create = cv.Mat.prototype.create
+    let allocated = 0
+    const allocation = vi.spyOn(cv.Mat.prototype, 'create').mockImplementationOnce(function (
+      this: Mat,
+      ...args: unknown[]
+    ) {
+      // Force real WASM memory growth at the normalization allocation boundary.
+      allocated = cv._malloc(heapSize)
+      return Reflect.apply(create, this, args)
+    })
+    let rendered: Mat | undefined
+    try {
+      rendered = processEffects(cv, source, effects, adjustments)
+      expect(cv.HEAPU8.buffer.byteLength).toBeGreaterThan(heapSize)
+      expect(expected[0]).toBe(255)
+      expect(expected[(100 * source.cols + 100) * 4]).toBe(0)
+      expect(rendered.data).toEqual(expected)
+    } finally {
+      allocation.mockRestore()
+      rendered?.delete()
+      source.delete()
+      if (allocated) cv._free(allocated)
+    }
+  })
+})

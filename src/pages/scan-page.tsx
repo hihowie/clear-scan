@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button'
 import { useScanPersistence } from '@/hooks/use-scan-persistence'
 import { useScanPreview } from '@/hooks/use-scan-preview'
 import {
-  bulkUpdatePageMetadata,
+  bulkUpdatePageOrder,
   db,
   getProjectWithPages,
   putPage,
@@ -64,6 +64,14 @@ interface EngineLoadError {
 function nextPageRole(mode: ScanMode, pages: ScanPageModel[]): PageRole {
   if (mode !== 'id-card') return 'page'
   return pages.some((page) => page.role === 'front') ? 'back' : 'front'
+}
+
+function mergePageOrder(current: ScanPageModel[], ordered: ScanPageModel[]) {
+  const orders = new Map(ordered.map((page) => [page.id, page.order]))
+  return current.map((page) => {
+    const order = orders.get(page.id)
+    return order === undefined || order === page.order ? page : { ...page, order }
+  })
 }
 
 async function fallbackDetection(source: Blob): Promise<DetectionResult> {
@@ -522,9 +530,14 @@ export function ScanPage() {
       const remaining = sortedPages
         .filter((item) => item.id !== page.id)
         .map((item, index) => ({ ...item, order: index }))
-      await bulkUpdatePageMetadata(remaining)
-      setPages(remaining)
-      if (activePageId === page.id) {
+      await bulkUpdatePageOrder(remaining)
+      setPages((current) =>
+        mergePageOrder(
+          current.filter((item) => item.id !== page.id),
+          remaining,
+        ),
+      )
+      if (activeRef.current?.id === page.id) {
         setActivePageId(remaining[0]?.id)
         setStage(remaining.length ? (remaining[0].cropConfirmed ? 'enhance' : 'crop') : 'capture')
       }
@@ -553,8 +566,8 @@ export function ScanPage() {
     }))
     reorderInFlightRef.current = true
     try {
-      await bulkUpdatePageMetadata(reordered)
-      setPages(reordered)
+      await bulkUpdatePageOrder(reordered)
+      setPages((current) => mergePageOrder(current, reordered))
     } catch (reason) {
       toast.error('页面顺序保存失败', {
         id: 'page-order-save-error',

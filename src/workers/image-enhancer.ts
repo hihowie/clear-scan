@@ -559,8 +559,9 @@ function applyBlackWhiteDocument(cv: CV, output: Mat, flattenPaper: boolean) {
     if (flattenPaper) applyClassicalShadowRemoval(cv, output, 100)
     cv.cvtColor(output, gray, cv.COLOR_RGBA2GRAY)
     cv.bilateralFilter(gray, denoised, 5, 24, 4)
-    const denoisedData = denoised.data
     normalized.create(denoised.rows, denoised.cols, cv.CV_8UC1)
+    // Allocating a Mat can grow the WASM heap and detach existing data views.
+    const denoisedData = denoised.data
     const normalizedData = normalized.data
     const { blackPoint, range } = documentToneRange(
       percentile(denoisedData, 0.012),
