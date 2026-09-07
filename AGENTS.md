@@ -1,6 +1,8 @@
-1. 编写代码时你应该保证 KISS 和 YAGNI 原则, 不要写一堆垃圾代码就为了实现一个简单的功能
-2. 编写的代码注意保证模块化, 按照功能分块, 不要在单一文件中编写几千行代码
-3. 测试统一放在 `tests/`：`unit/` 存放按源码模块组织的单元测试，`integration/` 存放跨模块和页面流程测试，`e2e/` 存放端到端测试，`support/` 存放共用夹具、初始化和测试工具。不要将测试散放在 `src/` 或其他目录。
-4. 同一功能的测试按场景集中组织，明确各层测试的职责，复用公共夹具和辅助函数，避免重复覆盖。调整测试目录时，同步更新测试配置、类型检查范围和文档。
-5. 修复 bug 时先定位并说明根因，在负责该行为的模块解决问题，并补充必要的回归测试，覆盖实际触发场景。
-6. 工作报告、根因分析和验证结果使用中文，清楚说明改了什么、为什么这样改，以及实际执行的检查结果。
+1. Follow KISS and YAGNI. Keep solutions simple and avoid unnecessary code or abstractions.
+2. Keep code modular and organize it by functionality. Avoid files containing thousands of lines.
+3. Keep all tests under `tests/`: `unit/` for unit tests organized by source module, `integration/` for cross-module and page workflow tests, `e2e/` for end-to-end tests, and `support/` for shared fixtures, setup, and test helpers. Do not scatter tests across `src/` or other directories.
+4. Group tests for the same functionality by scenario, give each test layer a clear responsibility, reuse shared fixtures and helpers, and avoid duplicate coverage. When moving tests, update test configuration, type-checking scope, and documentation together.
+5. When fixing a bug, identify and explain its root cause, fix it in the module responsible for the behavior, and add necessary regression tests covering the actual triggering scenario.
+6. Use Chinese only when communicating with the user, including progress updates, reports, root cause explanations, and validation results. Clearly describe what changed, why it changed, and the results of checks actually performed.
+7. Use English for code comments and Git commit messages, including both the subject and body.
+8. Use ASCII punctuation and symbols instead of Chinese or full-width punctuation and symbols, including in Chinese replies to the user.
