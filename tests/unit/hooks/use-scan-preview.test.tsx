@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_QUAD } from '@/lib/geometry'
 import { scannerClient } from '@/lib/scanner-client'
 import { DEFAULT_ADJUSTMENTS, SMART_EFFECTS, type ScanPage } from '@/lib/types'
-import { useScanPreview } from './use-scan-preview'
+import { useScanPreview } from '@/hooks/use-scan-preview'
 
 function makePage(id = 'page-1', brightness = 0): ScanPage {
   return {

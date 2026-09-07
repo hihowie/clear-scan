@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { histogramPercentile, percentile, scaledOdd } from './worker-image-utils'
+import { histogramPercentile, percentile, scaledOdd } from '@/workers/worker-image-utils'
 
 describe('worker image utilities', () => {
   it('calculates byte percentiles from samples and existing histograms', () => {

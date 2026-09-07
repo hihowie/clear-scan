@@ -53,9 +53,9 @@ async function composeIdCard(
   if (!front || !back) throw new Error('请先完成身份证正反两面扫描')
 
   onProgress?.(15, '正在处理身份证人像面')
-  const frontImage = await renderScanPage(front, 'image/jpeg')
+  const frontImage = await renderScanPage(front, mimeType)
   onProgress?.(48, '正在处理身份证国徽面')
-  const backImage = await renderScanPage(back, 'image/jpeg')
+  const backImage = await renderScanPage(back, mimeType)
   const [frontBitmap, backBitmap] = await Promise.all([
     createImageBitmap(frontImage.blob),
     createImageBitmap(backImage.blob),

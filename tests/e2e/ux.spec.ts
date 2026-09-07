@@ -1,9 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
-import { waitForScannerReady } from './helpers'
+import { holdNextThumbnailEncoding, waitForScannerReady } from './helpers'
 
-const documentFixture = fs.readFileSync(path.resolve('e2e/fixtures/document.png'))
+const documentFixture = fs.readFileSync(path.resolve('tests/e2e/fixtures/document.png'))
 
 async function expectNoHorizontalOverflow(page: Page) {
   const overflow = await page.evaluate(
@@ -278,16 +278,28 @@ test('scan editing stays reachable and survives rapid page changes on desktop an
   await page.getByRole('button', { name: '打开第 1 页' }).click()
   await expect(blackWhite).toHaveAttribute('aria-pressed', 'true')
 
-  const grayscale = page.getByRole('button', { name: '灰度', exact: true })
-  await grayscale.click()
-  await expect(grayscale).toHaveAttribute('aria-pressed', 'true')
-  await page.getByRole('link', { name: '首页', exact: true }).click()
-  await expect(page.getByRole('heading', { name: /清晰扫描仪/ })).toBeVisible()
-  await expect
-    .poll(async () => (await storedPageState(page, 'page-one.png')).color)
-    .toBe('grayscale')
+  await expect(page.getByRole('button', { name: '保存页面' })).toBeEnabled()
+  const thumbnailSave = await holdNextThumbnailEncoding(page)
+  try {
+    await page.getByRole('button', { name: '保存页面' }).click()
+    await thumbnailSave.waitUntilBlocked()
+    const grayscale = page.getByRole('button', { name: '灰度', exact: true })
+    await grayscale.click()
+    await expect(grayscale).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('link', { name: '首页', exact: true }).click()
+    await expect(page.getByRole('heading', { name: /清晰扫描仪/ })).toBeVisible()
+    // Reopen through the SPA while the previous mount still has queued writes.
+    // A full page.goto() would discard that queue and miss the regression.
+    await page
+      .locator(`a[href="${new URL(projectUrl).hash}"]`)
+      .filter({ has: page.getByRole('heading') })
+      .click()
+    await expect(page.getByRole('status').getByText('正在打开扫描项目…')).toBeVisible()
+    await expect(page.getByRole('button', { name: '灰度', exact: true })).toHaveCount(0)
+  } finally {
+    await thumbnailSave.release()
+  }
 
-  await page.goto(projectUrl)
   await expect(page.getByText('调整扫描效果')).toBeVisible({
     timeout: 120_000,
   })
@@ -295,6 +307,9 @@ test('scan editing stays reachable and survives rapid page changes on desktop an
     'aria-pressed',
     'true',
   )
+  await expect
+    .poll(async () => (await storedPageState(page, 'page-one.png')).color)
+    .toBe('grayscale')
   await page.getByRole('button', { name: '调整边缘' }).click()
   await expect(page.getByText('已手动调整边缘')).toBeVisible()
   await expect(page.getByRole('img', { name: '扫描增强预览' })).toHaveCount(0)
@@ -307,7 +322,9 @@ test('scan editing stays reachable and survives rapid page changes on desktop an
   await expect(page.getByRole('img', { name: '待裁剪文档' })).toBeVisible()
   await expect
     .poll(() =>
-      page.getByRole('img', { name: '待裁剪文档' }).evaluate((image) => image.naturalWidth),
+      page
+        .getByRole('img', { name: '待裁剪文档' })
+        .evaluate((image: HTMLImageElement) => image.naturalWidth),
     )
     .toBeGreaterThan(0)
   await page.getByRole('button', { name: '确认裁剪' }).click()
@@ -331,4 +348,16 @@ test('scan editing stays reachable and survives rapid page changes on desktop an
     expect(saveBox!.y + saveBox!.height).toBeLessThanOrEqual(navigationBox!.y)
   }
   await expectNoHorizontalOverflow(page)
+  if (testInfo.project.name === 'mobile-chromium') {
+    await page.getByRole('button', { name: '黑白', exact: true }).dispatchEvent('click')
+    await expect(page.getByRole('button', { name: '黑白', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await page.getByRole('link', { name: '扫一扫', exact: true }).dispatchEvent('click')
+    await expect(page.getByRole('heading', { name: '添加文档页面' })).toBeVisible()
+    await expect
+      .poll(async () => (await storedPageState(page, 'page-one.png')).color)
+      .toBe('black-white')
+  }
 })

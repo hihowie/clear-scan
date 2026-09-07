@@ -8,7 +8,7 @@ import {
   type EnhancementEffects,
   type EnhancementSettings,
 } from '@/lib/types'
-import { FilterPanel } from './filter-panel'
+import { FilterPanel } from '@/components/filter-panel'
 
 afterEach(cleanup)
 

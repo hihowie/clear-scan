@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { ScanProcessingOverlay } from './scan-page-workspaces'
+import { ScanProcessingOverlay } from '@/components/scan-page-workspaces'
 
 describe('ScanProcessingOverlay', () => {
   it('supports indeterminate engine loading and determinate photo progress', () => {

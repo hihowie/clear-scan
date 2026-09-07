@@ -157,6 +157,12 @@ pnpm test
 pnpm test:e2e
 ```
 
+测试统一放在 `tests/`：`pnpm test` 运行 `unit/` 和 `integration/`，`pnpm test:e2e` 运行 `e2e/`。保存与重开项目的回归用例分别覆盖数据库读写顺序和页面导航，可单独运行：
+
+```bash
+pnpm exec vitest run tests/unit/lib/db.test.ts tests/integration/scan-page.test.tsx
+```
+
 首次运行端到端测试前，如果本机尚未安装 Playwright Chromium：
 
 ```bash
@@ -189,7 +195,11 @@ src/
 ├── lib/              数据库、几何、检测评分、导出与工具函数
 ├── pages/            首页、扫描工作区和历史记录
 └── workers/          OpenCV 检测、透视和图像增强 Worker
-e2e/                  Playwright 端到端测试与图片夹具
+tests/
+├── unit/             按源码模块组织的单元测试
+├── integration/      页面、路由与持久化协作测试
+├── e2e/              Playwright 端到端测试与图片夹具
+└── support/          共用夹具、初始化与测试工具
 .github/workflows/    GitHub Pages 自动部署
 ```
 

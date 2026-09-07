@@ -28,6 +28,40 @@ class ScannerDatabase extends Dexie {
 
 export const db = new ScannerDatabase()
 
+interface PendingPageWrite {
+  projectId: string
+  promise: Promise<unknown>
+}
+
+const pageWrites = new Map<string, PendingPageWrite>()
+
+function queuePageWrite<T>(page: ScanPage, write: () => Promise<T>): Promise<T> {
+  // Thumbnail encoding and slow writes must finish before newer edits to the
+  // same page, including autosaves and flushes triggered by navigation.
+  const previous = pageWrites.get(page.id)?.promise ?? Promise.resolve()
+  const pending = previous.catch(() => undefined).then(write)
+  const entry = { projectId: page.projectId, promise: pending }
+  pageWrites.set(page.id, entry)
+  const release = () => {
+    if (pageWrites.get(page.id) === entry) pageWrites.delete(page.id)
+  }
+  void pending.then(release, release)
+  return pending
+}
+
+async function waitForProjectWrites(projectId: string) {
+  // The queue outlives ScanPage mounts. Editable reads must observe writes
+  // from previous mounts, including saves appended while a read is waiting.
+  for (;;) {
+    const pending = [...pageWrites.values()]
+      .filter((entry) => entry.projectId === projectId)
+      .map((entry) => entry.promise)
+    if (!pending.length) return
+    // Writers report their own errors; a failed write must not strand readers.
+    await Promise.allSettled(pending)
+  }
+}
+
 async function encodeBinary(blob: Blob): Promise<StoredBinary> {
   return {
     data: await blob.arrayBuffer(),
@@ -78,30 +112,37 @@ export async function bulkPutPages(pages: ScanPage[]) {
 }
 
 export async function updatePageMetadata(page: ScanPage) {
-  const updated = await db.pages.update(page.id, pageMetadata(page))
-  if (!updated) return putPage(page)
-  return updated
+  // Creation goes through putPage(). A queued edit that outlives a page,
+  // project or history deletion must never insert the deleted image again.
+  return queuePageWrite(page, () => db.pages.update(page.id, pageMetadata(page)))
 }
 
 export async function updatePageWithThumbnail(page: ScanPage, thumbnail: Blob) {
-  const updated = await db.pages.update(page.id, {
-    ...pageMetadata(page),
-    thumbnail: await encodeBinary(thumbnail),
+  return queuePageWrite(page, async () => {
+    return db.pages.update(page.id, {
+      ...pageMetadata(page),
+      thumbnail: await encodeBinary(thumbnail),
+    })
   })
-  if (!updated) return putPage({ ...page, thumbnail })
-  return updated
 }
 
 export async function bulkUpdatePageMetadata(pages: ScanPage[]) {
   return Promise.all(pages.map(updatePageMetadata))
 }
 
-export async function getProjectPages(projectId: string) {
+async function readProjectPages(projectId: string) {
   const pages = await db.pages.where('projectId').equals(projectId).sortBy('order')
   return pages.map(decodePage)
 }
 
+export async function getProjectPages(projectId: string) {
+  await waitForProjectWrites(projectId)
+  return readProjectPages(projectId)
+}
+
 export async function getProjectPageSummary(projectId: string) {
+  // Summaries display committed data without creating editable snapshots, so
+  // Home/History can remain available while a thumbnail save is pending.
   const [pageCount, coverPage] = await Promise.all([
     db.pages.where('projectId').equals(projectId).count(),
     db.pages
@@ -117,9 +158,10 @@ export async function getProjectPageSummary(projectId: string) {
 }
 
 export async function getProjectWithPages(projectId: string) {
+  await waitForProjectWrites(projectId)
   const [project, pages] = await Promise.all([
     db.projects.get(projectId),
-    getProjectPages(projectId),
+    readProjectPages(projectId),
   ])
   return { project, pages }
 }

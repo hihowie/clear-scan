@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_QUAD } from '@/lib/geometry'
 import type { NormalizedQuad } from '@/lib/types'
-import { CropEditor } from './crop-editor'
+import { CropEditor } from '@/components/crop-editor'
 
 function editorRect(width = 1000, height = 500) {
   return {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_QUAD, fitWithin, orderPoints, quadAspectRatio } from './geometry'
+import { DEFAULT_QUAD, fitWithin, orderPoints, quadAspectRatio } from '@/lib/geometry'
 
 describe('document geometry', () => {
   it('orders arbitrary corner points clockwise from top-left', () => {

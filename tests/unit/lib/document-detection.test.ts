@@ -5,8 +5,8 @@ import {
   lineIntersection,
   scoreDetectionCandidate,
   suppressNestedCandidates,
-} from './document-detection'
-import type { NormalizedQuad } from './types'
+} from '@/lib/document-detection'
+import type { NormalizedQuad } from '@/lib/types'
 
 const centered: NormalizedQuad = [
   { x: 0.12, y: 0.2 },

@@ -91,6 +91,7 @@ export function ScanPage() {
   const reorderInFlightRef = useRef(false)
   const [project, setProject] = useState<ScanProject>()
   const [pages, setPages] = useState<ScanPageModel[]>([])
+  const pagesRef = useRef(pages)
   const [activePageId, setActivePageId] = useState<string>()
   const [stage, setStage] = useState<ScanStage>('capture')
   const [passportLayout, setPassportLayoutState] = useState<PassportLayout>('data-page')
@@ -110,7 +111,7 @@ export function ScanPage() {
   const [deletingPage, setDeletingPage] = useState(false)
   const [sourceUrl, setSourceUrl] = useState<string>()
   const active = pages.find((page) => page.id === activePageId)
-  const activeRef = useScanPersistence(active, project)
+  const { pageRef: activeRef, persistActivePage } = useScanPersistence(active, project)
   const activeSource = active?.source
   const {
     preview: activePreview,
@@ -150,7 +151,22 @@ export function ScanPage() {
     : '这个页面'
 
   useEffect(() => {
-    if (scannerClient.isReady) return
+    pagesRef.current = pages
+  }, [pages])
+
+  const markEngineReady = useCallback(() => {
+    toast.dismiss('engine-loading-error')
+    setEngineLoadError(undefined)
+    setEngineLabel('图像引擎已就绪')
+    setShowEngineLoading(false)
+    setEngineLoading(false)
+  }, [])
+
+  useEffect(() => {
+    if (scannerClient.isReady) {
+      markEngineReady()
+      return
+    }
     let cancelled = false
     let finished = false
     const loadEngine = () => {
@@ -179,11 +195,7 @@ export function ScanPage() {
               await new Promise<void>((resolve) => window.setTimeout(resolve, remaining))
           }
           if (cancelled) return
-          toast.dismiss('engine-loading-error')
-          setEngineLoadError(undefined)
-          setEngineLabel('图像引擎已就绪')
-          setShowEngineLoading(false)
-          setEngineLoading(false)
+          markEngineReady()
         })
         .catch((reason: unknown) => {
           if (cancelled) return
@@ -206,7 +218,7 @@ export function ScanPage() {
       cancelled = true
       toast.dismiss('engine-loading-error')
     }
-  }, [engineLoadAttempt])
+  }, [engineLoadAttempt, markEngineReady])
 
   const retryEngine = () => {
     setEngineLoadError(undefined)
@@ -233,9 +245,13 @@ export function ScanPage() {
   }, [activePageId, stage])
 
   useEffect(() => {
+    // Flush this mount before changing projects. getProjectWithPages also
+    // waits for queued writes from earlier mounts of the destination project.
+    const pendingSave = persistActivePage()
     if (projectId) {
       let cancelled = false
-      void getProjectWithPages(projectId)
+      void pendingSave
+        .then(() => getProjectWithPages(projectId))
         .then(({ project: storedProject, pages: storedPages }) => {
           if (cancelled) return
           if (!storedProject) {
@@ -270,7 +286,7 @@ export function ScanPage() {
     setActivePageId(undefined)
     setStage('capture')
     setPassportLayoutState('data-page')
-  }, [navigate, projectId, routeMode])
+  }, [navigate, persistActivePage, projectId, routeMode])
 
   useEffect(() => {
     if (!activeSource) {
@@ -414,6 +430,7 @@ export function ScanPage() {
         })
     } finally {
       if (operationControllerRef.current === controller) operationControllerRef.current = null
+      if (scannerClient.isReady) markEngineReady()
       setProcessingIndeterminate(false)
       setBusy(false)
     }
@@ -432,12 +449,14 @@ export function ScanPage() {
       if (currentThumbnail) await updatePageWithThumbnail(saved, currentThumbnail)
       else await updatePageMetadata(saved)
       await db.projects.update(project.id, { updatedAt: Date.now() })
-      const nextPages = pages.map((page) => (page.id === saved.id ? saved : page))
-      setPages(nextPages)
+      // Every edit replaces the page object. Only merge the saved snapshot if
+      // that version is still current, keeping newer edits and other pages.
+      setPages((current) => current.map((page) => (page === active ? saved : page)))
       toast.success('页面已保存到本地')
       if (
         mode === 'id-card' &&
-        !nextPages.some((page) => page.role === (saved.role === 'front' ? 'back' : 'front'))
+        activeRef.current === active &&
+        !pagesRef.current.some((page) => page.role === (saved.role === 'front' ? 'back' : 'front'))
       ) {
         setActivePageId(undefined)
         setStage('capture')
@@ -584,35 +603,20 @@ export function ScanPage() {
         })
     } finally {
       if (operationControllerRef.current === controller) operationControllerRef.current = null
+      if (scannerClient.isReady) markEngineReady()
       setProcessingIndeterminate(false)
       setBusy(false)
     }
   }
 
-  const persistActivePage = () => {
-    if (!active) return
-    const saved = { ...active, updatedAt: Date.now() }
-    updateActive(() => saved)
-    void updatePageMetadata(saved)
-      .then(() =>
-        project ? db.projects.update(project.id, { updatedAt: saved.updatedAt }) : undefined,
-      )
-      .catch((reason: unknown) => {
-        toast.error('页面保存失败', {
-          id: 'scan-flush-error',
-          description: reason instanceof Error ? reason.message : '浏览器无法写入本地存储',
-        })
-      })
-  }
-
   const selectPage = (page: ScanPageModel) => {
-    persistActivePage()
+    void persistActivePage()
     setActivePageId(page.id)
     setStage(page.cropConfirmed ? 'enhance' : 'crop')
   }
 
   const startCapture = () => {
-    persistActivePage()
+    void persistActivePage()
     setActivePageId(undefined)
     setStage('capture')
   }
@@ -688,6 +692,17 @@ export function ScanPage() {
       })
     })
     setStage('crop')
+  }
+
+  if (projectId && project?.id !== projectId) {
+    return (
+      <div
+        className="grid min-h-[calc(100svh-4rem)] place-items-center text-sm text-muted-foreground"
+        role="status"
+      >
+        正在打开扫描项目…
+      </div>
+    )
   }
 
   return (

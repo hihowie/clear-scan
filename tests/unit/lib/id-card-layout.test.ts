@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getIdCardSheetLayout } from './id-card-layout'
+import { getIdCardSheetLayout } from '@/lib/id-card-layout'
 
 describe('ID card sheet layout', () => {
   it('gives both sides most of the width on an A4 export', () => {

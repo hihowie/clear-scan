@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
-import { DETECTION_CONFIDENCE_THRESHOLD } from '../src/lib/document-detection'
-import type { NormalizedQuad, ScanMode } from '../src/lib/types'
+import { DETECTION_CONFIDENCE_THRESHOLD } from '../../src/lib/document-detection'
+import type { NormalizedQuad, ScanMode } from '../../src/lib/types'
 import { waitForScannerReady } from './helpers'
 
 interface DetectionCase {
@@ -90,7 +90,7 @@ const cases: DetectionCase[] = [
 ]
 
 async function rasterizeSvg(page: Page, fixture: string) {
-  const svg = await readFile(path.resolve('e2e/fixtures', fixture), 'utf8')
+  const svg = await readFile(path.resolve('tests/e2e/fixtures', fixture), 'utf8')
   const bytes = await page.evaluate(async (source) => {
     const url = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml' }))
     try {

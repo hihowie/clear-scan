@@ -157,6 +157,12 @@ pnpm test
 pnpm test:e2e
 ```
 
+All tests live in `tests/`: `pnpm test` runs `unit/` and `integration/`, and `pnpm test:e2e` runs `e2e/`. Save-and-reopen regressions cover database ordering and page navigation. Run them independently with:
+
+```bash
+pnpm exec vitest run tests/unit/lib/db.test.ts tests/integration/scan-page.test.tsx
+```
+
 Before running the end-to-end suite for the first time, install Playwright Chromium if it is not already available:
 
 ```bash
@@ -189,7 +195,11 @@ src/
 ├── lib/              Database, geometry, detection scoring, export, and utilities
 ├── pages/            Home, scan workspace, and local history
 └── workers/          OpenCV detection, perspective, and enhancement worker
-e2e/                  Playwright end-to-end tests and image fixtures
+tests/
+├── unit/             Unit tests organized by source module
+├── integration/      Page, routing, and persistence integration tests
+├── e2e/              Playwright end-to-end tests and image fixtures
+└── support/          Shared fixtures, setup, and test helpers
 .github/workflows/    Automated GitHub Pages deployment
 ```
 

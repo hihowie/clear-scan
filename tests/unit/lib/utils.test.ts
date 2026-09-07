@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createId, modeDefaultName, sanitizeFileName } from './utils'
+import { createId, modeDefaultName, sanitizeFileName } from '@/lib/utils'
 
 afterEach(() => vi.unstubAllGlobals())
 

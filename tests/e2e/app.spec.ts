@@ -175,12 +175,33 @@ test('allows retrying after the image engine fails to load', async ({ page }) =>
   await expect(page.getByText('图像引擎加载失败')).toBeHidden()
 })
 
+test('upload recovers a failed image engine and clears its stale error', async ({ page }) => {
+  let failOpenCvRequest = true
+  await page.route('**/vendor/opencv.js', async (route) => {
+    if (failOpenCvRequest) await route.abort('failed')
+    else await route.continue()
+  })
+  await page.goto('/#/scan/document')
+  await expect(page.getByRole('alert')).toContainText('图像引擎加载失败')
+
+  failOpenCvRequest = false
+  await page
+    .locator('input[type="file"]')
+    .nth(1)
+    .setInputFiles(path.resolve('tests/e2e/fixtures/document.png'))
+
+  await expect(page.getByText('确认四个角点')).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByRole('alert')).toBeHidden()
+  await expect(page.getByRole('button', { name: '确认裁剪' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '重新识别' })).toBeEnabled()
+})
+
 test('uploads a document and reaches the crop editor', async ({ page }, testInfo) => {
   await page.goto('/#/scan/document')
   await expect(page.getByRole('heading', { name: '添加文档页面' })).toBeVisible()
   await waitForScannerReady(page)
   const upload = page.locator('input[type="file"]').nth(1)
-  await upload.setInputFiles(path.resolve('e2e/fixtures/document.png'))
+  await upload.setInputFiles(path.resolve('tests/e2e/fixtures/document.png'))
   await expect(page.getByText('确认四个角点')).toBeVisible({
     timeout: 120_000,
   })
@@ -328,7 +349,7 @@ test('shows progress while document edges are re-detected', async ({ page }) => 
   await page
     .locator('input[type="file"]')
     .nth(1)
-    .setInputFiles(path.resolve('e2e/fixtures/document.png'))
+    .setInputFiles(path.resolve('tests/e2e/fixtures/document.png'))
   await expect(page.getByText('确认四个角点')).toBeVisible({ timeout: 120_000 })
 
   const confirmCrop = page.getByRole('button', { name: '确认裁剪' })
@@ -347,7 +368,7 @@ test('scan history can clear all local projects', async ({ page }, testInfo) => 
   await page
     .locator('input[type="file"]')
     .nth(1)
-    .setInputFiles(path.resolve('e2e/fixtures/document.png'))
+    .setInputFiles(path.resolve('tests/e2e/fixtures/document.png'))
   await expect(page.getByText('确认四个角点')).toBeVisible({
     timeout: 120_000,
   })

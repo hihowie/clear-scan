@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { expect, test, type Page } from '@playwright/test'
 import { waitForScannerReady } from './helpers'
 
@@ -437,4 +438,49 @@ test('brightness balance lowers a dominant bright area while lifting shadows', a
   expect(balanced.leftPaper.luma).toBeGreaterThan(original.leftPaper.luma + 20)
   expect(balanced.rightPaper.luma).toBeLessThan(original.rightPaper.luma - 15)
   expect(balancedVariation).toBeLessThan(originalVariation * 0.4)
+})
+
+test('grayscale brightness changes both the preview and exported PNG', async ({ page }) => {
+  await page.goto('/#/scan/document')
+  await waitForScannerReady(page)
+  await page
+    .locator('input[type="file"]')
+    .nth(1)
+    .setInputFiles({
+      name: 'brightness-fixture.png',
+      mimeType: 'image/png',
+      buffer: await createQualityFixture(page),
+    })
+  await expect(page.getByText('确认四个角点')).toBeVisible({ timeout: 120_000 })
+  await page.getByRole('button', { name: '确认裁剪' }).click()
+  let previous = await waitForPreviewChange(page)
+  previous = await selectEffect(page, '色彩风格', '灰度', previous)
+  await page.getByText('高级微调', { exact: true }).click()
+  await page.getByRole('slider', { name: '均衡强度' }).press('Home')
+  previous = await waitForPreviewChange(page, previous)
+
+  const previews: number[] = []
+  const exports: Buffer[] = []
+  for (const value of [0, 10, 20]) {
+    const brightness = page.getByRole('slider', { name: '亮度', exact: true })
+    if (value > 0) {
+      for (let step = 0; step < 10; step += 1) await brightness.press('ArrowRight')
+      await expect(brightness).toHaveAttribute('aria-valuenow', String(value))
+      previous = await waitForPreviewChange(page, previous)
+    }
+    previews.push((await readRegions(page)).lowInk.luma)
+    await page.getByRole('button', { name: '导出', exact: true }).click()
+    await page.getByRole('button', { name: /PNG 图片/ }).click()
+    const downloading = page.waitForEvent('download')
+    await page.getByRole('button', { name: '生成并下载' }).click()
+    const download = await downloading
+    expect(download.suggestedFilename()).toMatch(/\.png$/)
+    exports.push(await readFile((await download.path())!))
+    await expect(page.getByRole('dialog')).toBeHidden()
+  }
+
+  expect(previews[1]).toBeGreaterThan(previews[0] + 6)
+  expect(previews[2]).toBeGreaterThan(previews[1] + 6)
+  expect(exports[0].equals(exports[1])).toBe(false)
+  expect(exports[1].equals(exports[2])).toBe(false)
 })

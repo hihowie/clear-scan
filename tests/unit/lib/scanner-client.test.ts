@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_QUAD } from './geometry'
+import { DEFAULT_QUAD } from '@/lib/geometry'
 import {
   ENGINE_INITIALIZATION_TIMEOUT_MS,
   ENGINE_TIMEOUT_MESSAGE,
   ScannerClient,
   createRenderCacheKey,
   isAbortError,
-} from './scanner-client'
+} from '@/lib/scanner-client'
 import {
   DEFAULT_ADJUSTMENTS,
   SMART_EFFECTS,
   type ScanPage,
   type ScannerWorkerRequest,
-} from './types'
+} from '@/lib/types'
 
 class WorkerMock extends EventTarget {
   static instances: WorkerMock[] = []

@@ -460,6 +460,14 @@ function applyBrightnessBalance(cv: CV, source: Mat, strength: number) {
   }
 }
 
+function documentToneRange(blackPercentile: number, paperPercentile: number, minimumRange: number) {
+  const paperPoint = Math.max(minimumRange, paperPercentile)
+  // Sparse ink may not reach the low percentile. Keep the black point below
+  // the observed paper instead of moving the white point beyond the paper.
+  const blackPoint = Math.min(blackPercentile, paperPoint - minimumRange)
+  return { blackPoint, range: paperPoint - blackPoint }
+}
+
 function applyDocumentColorEnhancement(
   cv: CV,
   output: Mat,
@@ -476,9 +484,11 @@ function applyDocumentColorEnhancement(
   const greenScale = clamp(whitePoint.luma / Math.max(1, whitePoint.green), 0.84, 1.2)
   const blueScale = clamp(whitePoint.luma / Math.max(1, whitePoint.blue), 0.84, 1.2)
   const { histogram, count } = balancedLumaHistogram(data, redScale, greenScale, blueScale)
-  const blackPoint = histogramPercentile(histogram, count, 0.015)
-  const paperPoint = Math.max(blackPoint + 48, histogramPercentile(histogram, count, 0.86))
-  const range = paperPoint - blackPoint
+  const { blackPoint, range } = documentToneRange(
+    histogramPercentile(histogram, count, 0.015),
+    histogramPercentile(histogram, count, 0.86),
+    48,
+  )
   const normalizedWhitening = clamp(whiteningStrength, 0, 100)
   const whiteningAmount = clamp(normalizedWhitening / DEFAULT_WHITENING_STRENGTH, 0, 1)
   const extraWhitening = clamp(
@@ -520,10 +530,11 @@ function applyGrayscaleDocument(cv: CV, output: Mat, flattenPaper: boolean) {
     cv.cvtColor(output, gray, cv.COLOR_RGBA2GRAY)
     cv.bilateralFilter(gray, denoised, 5, 22, 4)
     const denoisedData = denoised.data
-    const blackPoint = percentile(denoisedData, 0.018)
-    const paperPercentile = percentile(denoisedData, 0.86)
-    const paperPoint = Math.max(blackPoint + 48, paperPercentile)
-    const range = paperPoint - blackPoint
+    const { blackPoint, range } = documentToneRange(
+      percentile(denoisedData, 0.018),
+      percentile(denoisedData, 0.86),
+      48,
+    )
     const toneMap = new Uint8Array(256)
     for (let value = 0; value < toneMap.length; value += 1) {
       const normalized = clamp((value - blackPoint) / range, 0, 1)
@@ -551,9 +562,11 @@ function applyBlackWhiteDocument(cv: CV, output: Mat, flattenPaper: boolean) {
     const denoisedData = denoised.data
     normalized.create(denoised.rows, denoised.cols, cv.CV_8UC1)
     const normalizedData = normalized.data
-    const blackPoint = percentile(denoisedData, 0.012)
-    const paperPoint = Math.max(blackPoint + 52, percentile(denoisedData, 0.86))
-    const range = paperPoint - blackPoint
+    const { blackPoint, range } = documentToneRange(
+      percentile(denoisedData, 0.012),
+      percentile(denoisedData, 0.86),
+      52,
+    )
     const toneMap = new Uint8Array(256)
     for (let value = 0; value < toneMap.length; value += 1) {
       const normalized = clamp((value - blackPoint) / range, 0, 1)
@@ -660,7 +673,6 @@ function applyPostLightingEffects(
   effects: EnhancementEffects,
   adjustments: EnhancementSettings,
 ) {
-  applyToneAdjustments(output, adjustments)
   applyColorEffect(
     cv,
     output,
@@ -671,6 +683,9 @@ function applyPostLightingEffects(
   if (effects.detail === 'sharpen') {
     applyDetailEnhancement(cv, output, adjustments.sharpness)
   }
+  // Apply the user's final exposure and contrast after automatic normalization
+  // so recalculating the paper and black points cannot cancel the adjustment.
+  applyToneAdjustments(output, adjustments)
 }
 
 function processCopy(cv: CV, source: Mat, operation: (output: Mat) => void) {

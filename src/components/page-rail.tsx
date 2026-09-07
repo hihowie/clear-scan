@@ -4,6 +4,17 @@ import { Button } from '@/components/ui/button'
 import type { ScanMode, ScanPage } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
+function PageThumbnail({ source }: { source: Blob }) {
+  const [url, setUrl] = useState<string>()
+  useEffect(() => {
+    const nextUrl = URL.createObjectURL(source)
+    setUrl(nextUrl)
+    return () => URL.revokeObjectURL(nextUrl)
+  }, [source])
+
+  return <img src={url} alt="" className="size-full object-cover" />
+}
+
 export function PageRail({
   mode,
   pages,
@@ -21,16 +32,7 @@ export function PageRail({
   onDelete: (page: ScanPage) => void
   onMove: (page: ScanPage, direction: -1 | 1) => void
 }) {
-  const [urls, setUrls] = useState<Record<string, string>>({})
   const sorted = useMemo(() => [...pages].sort((a, b) => a.order - b.order), [pages])
-  useEffect(() => {
-    const next: Record<string, string> = {}
-    sorted.forEach((page) => {
-      next[page.id] = URL.createObjectURL(page.source)
-    })
-    setUrls(next)
-    return () => Object.values(next).forEach((url) => URL.revokeObjectURL(url))
-  }, [sorted])
 
   return (
     <div
@@ -59,7 +61,7 @@ export function PageRail({
               className="block w-28 lg:w-full"
             >
               <div className="aspect-[4/3] overflow-hidden rounded-lg bg-muted">
-                <img src={urls[page.id]} alt="" className="size-full object-cover" />
+                <PageThumbnail source={page.source} />
               </div>
               <span className="mt-1.5 block truncate px-1 text-[10px] font-semibold">
                 {label}
