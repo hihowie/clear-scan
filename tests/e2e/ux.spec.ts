@@ -62,6 +62,70 @@ async function seedEditableProject(page: Page, legacy = false) {
   await page.goto('/#/project/project-1')
 }
 
+test('scan project names stay inline on desktop and save direct edits on all screens', async ({
+  page,
+}, testInfo) => {
+  await seedEditableProject(page)
+  const projectName = page.getByRole('textbox', { name: '项目名称' })
+  await expect(projectName).toHaveValue('测试文档')
+
+  if (testInfo.project.name === 'desktop-chromium') {
+    const [modeBox, countBox, nameBox] = await Promise.all([
+      page.getByText('文档扫描', { exact: true }).boundingBox(),
+      page.getByText('1 页', { exact: true }).boundingBox(),
+      projectName.boundingBox(),
+    ])
+    expect(modeBox).not.toBeNull()
+    expect(countBox).not.toBeNull()
+    expect(nameBox).not.toBeNull()
+    expect(nameBox!.x).toBeGreaterThan(countBox!.x + countBox!.width)
+    for (const box of [modeBox!, countBox!]) {
+      expect(
+        Math.abs(box.y + box.height / 2 - nameBox!.y - nameBox!.height / 2),
+      ).toBeLessThanOrEqual(1)
+    }
+  }
+
+  await expect(page.getByRole('button', { name: '重命名项目' })).toHaveCount(0)
+  const pencil = page.locator('label').filter({ has: projectName }).locator('svg')
+  await expect(pencil).toBeVisible()
+  const [pencilBox, nameBox] = await Promise.all([pencil.boundingBox(), projectName.boundingBox()])
+  expect(pencilBox).not.toBeNull()
+  expect(nameBox).not.toBeNull()
+  expect(pencilBox!.x + pencilBox!.width).toBeLessThan(nameBox!.x)
+  await projectName.click()
+  await expect(projectName).toBeFocused()
+  await expect(page.getByText('修改自动保存', { exact: true })).toHaveCount(0)
+
+  const renamed = '会议纪要与扫描归档资料'.repeat(8)
+  await projectName.fill(renamed)
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const dbPath = '/src/lib/db.ts'
+        const { db } = await import(dbPath)
+        return (await db.projects.get('project-1'))?.name
+      }),
+    )
+    .toBe(renamed)
+  await expect(projectName).toBeFocused()
+  await projectName.press('Tab')
+  await page.reload()
+  await expect(projectName).toHaveValue(renamed)
+  await expectNoHorizontalOverflow(page)
+  await expect(page.getByRole('button', { name: '导出', exact: true })).toBeVisible()
+
+  if (testInfo.project.name === 'mobile-chromium') {
+    await page.setViewportSize({ width: 320, height: 568 })
+    await expectNoHorizontalOverflow(page)
+    await expect(projectName).toBeVisible()
+    await projectName.click()
+    await expect(projectName).toBeFocused()
+    await expectNoHorizontalOverflow(page)
+    await expect(page.getByRole('button', { name: '导出', exact: true })).toBeVisible()
+  }
+})
+
 test('desktop and mobile shells expose useful empty, install, and fallback states', async ({
   page,
 }, testInfo) => {

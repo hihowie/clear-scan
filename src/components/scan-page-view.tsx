@@ -3,6 +3,7 @@ import {
   ChevronRight,
   Crop,
   LoaderCircle,
+  Pencil,
   ScanLine,
   Sparkles,
   Trash2,
@@ -44,34 +45,48 @@ export function ScanPageHeader({
 }) {
   return (
     <div className="border-b border-border/80 bg-card lg:shrink-0">
-      <div className="mx-auto max-w-[1480px] px-4 py-3 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onBack} aria-label="返回首页">
-              <ArrowLeft />
-            </Button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">{MODE_LABELS[mode]}</Badge>
-                <span className="text-[10px] font-semibold text-muted-foreground">
-                  {pages.length} 页
+      <div className="mx-auto grid max-w-[1480px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[auto_auto_minmax(0,1fr)_auto] sm:px-6">
+        <Button variant="ghost" size="icon" onClick={onBack} aria-label="返回首页">
+          <ArrowLeft />
+        </Button>
+        <div className="flex items-center gap-2 whitespace-nowrap">
+          <Badge variant="secondary">{MODE_LABELS[mode]}</Badge>
+          <span className="text-[10px] font-semibold text-muted-foreground">{pages.length} 页</span>
+        </div>
+        {project ? (
+          <div className="group col-span-3 row-start-2 w-fit min-w-0 max-w-full sm:col-span-1 sm:col-start-3 sm:row-start-1">
+            <label
+              className="flex max-w-sm cursor-text items-center gap-2 border-b border-transparent py-1 transition hover:border-border focus-within:border-primary"
+              title="点击修改名称, 修改自动保存"
+            >
+              <Pencil
+                aria-hidden="true"
+                className="size-3.5 shrink-0 text-muted-foreground transition group-hover:text-primary group-focus-within:text-primary"
+              />
+              <span className="relative min-w-0 text-sm font-bold">
+                <span
+                  aria-hidden="true"
+                  className="invisible block overflow-hidden pr-4 whitespace-pre"
+                >
+                  {project.name || '未命名文档'}
                 </span>
-              </div>
-              {project ? (
                 <input
                   value={project.name}
                   onChange={(event) => onRename(event.target.value)}
-                  className="-ml-2 mt-1 h-9 max-w-[15rem] truncate rounded-lg bg-transparent px-2 text-sm font-bold outline-none transition focus:bg-muted focus:text-primary sm:max-w-md"
+                  className="absolute inset-0 size-full min-w-0 truncate bg-transparent pr-4 outline-none"
                   aria-label="项目名称"
+                  placeholder="未命名文档"
                 />
-              ) : (
-                <h1 className="mt-1 text-sm font-bold">新建{MODE_LABELS[mode]}</h1>
-              )}
-            </div>
+              </span>
+            </label>
           </div>
-          <div className="flex items-center gap-2">
-            {project && <ExportDialog project={project} pages={pages} />}
-          </div>
+        ) : (
+          <h1 className="col-span-3 row-start-2 text-sm font-bold sm:col-span-1 sm:col-start-3 sm:row-start-1">
+            新建{MODE_LABELS[mode]}
+          </h1>
+        )}
+        <div className="col-start-3 row-start-1 justify-self-end sm:col-start-4">
+          {project && <ExportDialog project={project} pages={pages} />}
         </div>
       </div>
     </div>
