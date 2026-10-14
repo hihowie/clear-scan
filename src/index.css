@@ -61,6 +61,7 @@ html {
   min-height: 100%;
   background: hsl(var(--background));
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -75,6 +76,11 @@ body {
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+/* The root gutter already reserves the space Radix compensates for when locking scroll. */
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
 }
 
 @layer base {

@@ -7,12 +7,8 @@ import {
   createRenderCacheKey,
   isAbortError,
 } from '@/lib/scanner-client'
-import {
-  DEFAULT_ADJUSTMENTS,
-  SMART_EFFECTS,
-  type ScanPage,
-  type ScannerWorkerRequest,
-} from '@/lib/types'
+import type { ScannerWorkerRequest } from '@/lib/types'
+import { makePage } from '../../support/scan-fixtures'
 
 class WorkerMock extends EventTarget {
   static instances: WorkerMock[] = []
@@ -34,29 +30,6 @@ class WorkerMock extends EventTarget {
 
   respond(data: unknown) {
     this.dispatchEvent(new MessageEvent('message', { data }))
-  }
-}
-
-function makePage(adjustment = 0): ScanPage {
-  return {
-    id: 'page-1',
-    projectId: 'project-1',
-    order: 0,
-    role: 'page',
-    source: new Blob(['source'], { type: 'image/jpeg' }),
-    sourceName: 'source.jpg',
-    width: 1200,
-    height: 900,
-    corners: DEFAULT_QUAD,
-    confidence: 0.9,
-    cornerSource: 'detected',
-    cropConfirmed: true,
-    glareLevel: 'none',
-    rotation: 0,
-    effects: { ...SMART_EFFECTS },
-    adjustments: { ...DEFAULT_ADJUSTMENTS, brightness: adjustment },
-    createdAt: 1,
-    updatedAt: 1 + adjustment,
   }
 }
 
@@ -116,10 +89,19 @@ describe('scanner request scheduling', () => {
   it('keeps only the newest queued preview', async () => {
     const client = new ScannerClient()
     const options = { maxEdge: 1400, mimeType: 'image/jpeg' as const, quality: 0.9 }
-    const first = client.render(makePage(0), options, { intent: 'preview' })
-    const second = client.render(makePage(1), options, { intent: 'preview' })
+    const page = makePage()
+    const first = client.render(page, options, { intent: 'preview' })
+    const second = client.render(
+      { ...page, adjustments: { ...page.adjustments, brightness: 1 } },
+      options,
+      { intent: 'preview' },
+    )
     const secondRejected = second.catch((error: unknown) => error)
-    const third = client.render(makePage(2), options, { intent: 'preview' })
+    const third = client.render(
+      { ...page, adjustments: { ...page.adjustments, brightness: 2 } },
+      options,
+      { intent: 'preview' },
+    )
     const worker = WorkerMock.instances[0]
 
     expect(worker.messages).toHaveLength(1)
@@ -312,9 +294,12 @@ describe('render cache keys', () => {
     expect(createRenderCacheKey({ ...original, updatedAt: 99 }, options)).toBe(
       createRenderCacheKey(original, options),
     )
-    expect(createRenderCacheKey(makePage(1), options)).not.toBe(
-      createRenderCacheKey(original, options),
-    )
+    expect(
+      createRenderCacheKey(
+        { ...original, adjustments: { ...original.adjustments, brightness: 1 } },
+        options,
+      ),
+    ).not.toBe(createRenderCacheKey(original, options))
     expect(
       createRenderCacheKey(
         {

@@ -23,7 +23,7 @@ export interface EnhancementEffects {
 
 export type GlareLevel = 'none' | 'mild' | 'severe'
 
-export type CornerSource = 'detected' | 'manual' | 'fallback' | 'unverified'
+export type CornerSource = 'detected' | 'manual' | 'fallback'
 
 export interface Point {
   x: number

@@ -11,18 +11,9 @@ import {
   updatePageMetadata,
   updatePageWithThumbnail,
 } from '@/lib/db'
-import { DEFAULT_QUAD } from '@/lib/geometry'
 import { makePage, makeProject } from '../../support/scan-fixtures'
 import { holdNextPageWrite, holdThumbnailEncoding } from '../../support/persistence'
-import {
-  DEFAULT_ADJUSTMENTS,
-  DEFAULT_WHITENING_STRENGTH,
-  ORIGINAL_EFFECTS,
-  SMART_EFFECTS,
-  type EnhancementSettings,
-  type ScanPage,
-  type ScanProject,
-} from '@/lib/types'
+import { DEFAULT_ADJUSTMENTS, SMART_EFFECTS } from '@/lib/types'
 
 afterEach(async () => {
   vi.restoreAllMocks()
@@ -226,85 +217,17 @@ describe('local scan repository', () => {
     expect(stored.rotation).toBe(90)
   })
 
-  describe('legacy page effects', () => {
-    it.each([
-      ['original', ORIGINAL_EFFECTS],
-      ['smart', SMART_EFFECTS],
-      ['deshadow', { ...ORIGINAL_EFFECTS, shadow: 'deshadow' }],
-      ['ai-deshadow', { ...ORIGINAL_EFFECTS, shadow: 'deshadow' }],
-      ['deglare', { ...ORIGINAL_EFFECTS, glare: 'deglare' }],
-      ['grayscale', { ...ORIGINAL_EFFECTS, color: 'grayscale' }],
-      ['black-white', { ...ORIGINAL_EFFECTS, color: 'black-white' }],
-      ['sharpen', { ...ORIGINAL_EFFECTS, detail: 'sharpen' }],
-      ['vivid', { ...ORIGINAL_EFFECTS, color: 'enhanced-color' }],
-    ] as const)('restores the %s preset from records without effects', async (filter, effects) => {
-      const page = makePage()
-      await bulkPutPages([page])
-      await db.pages.update(page.id, { effects: undefined, filter })
-      const [stored] = await getProjectPages(page.projectId)
-      expect(stored.effects).toEqual(effects)
-      expect(stored).not.toHaveProperty('filter')
-      await updatePageMetadata(stored)
-      expect((await db.pages.get(page.id))?.effects).toEqual(effects)
-    })
-
-    it('preserves composed effects ahead of an older preset and replaces retired values', async () => {
-      const page = makePage()
-      await bulkPutPages([page])
-      await db.pages.update(page.id, {
-        filter: 'original',
-        effects: { shadow: 'ai-deshadow', glare: 'deglare', color: 'vivid', detail: 'sharpen' },
-      })
-      expect((await getProjectPages(page.projectId))[0].effects).toEqual({
-        shadow: 'deshadow',
-        glare: 'deglare',
-        color: 'enhanced-color',
-        detail: 'sharpen',
-      })
-    })
-
-    it('uses original effects when a legacy record has neither effects nor a preset', async () => {
-      const page = makePage()
-      await bulkPutPages([page])
-      await db.pages.update(page.id, { effects: undefined })
-      expect((await getProjectPages(page.projectId))[0].effects).toEqual(ORIGINAL_EFFECTS)
-    })
-  })
-
   it('stores a project with its ordered pages and deletes them atomically', async () => {
-    const now = Date.now()
-    const project: ScanProject = {
-      id: 'project-1',
-      mode: 'document',
-      name: '测试文档',
-      createdAt: now,
-      updatedAt: now,
-    }
-    const makePage = (id: string, order: number): ScanPage => ({
-      id,
-      projectId: project.id,
-      order,
-      role: 'page',
-      source: new Blob(['image'], { type: 'image/jpeg' }),
-      sourceName: `${id}.jpg`,
-      width: 100,
-      height: 140,
-      corners: DEFAULT_QUAD,
-      confidence: 0.8,
-      cornerSource: 'detected',
+    const project = makeProject()
+    const firstPage = makePage({
+      cornerSource: 'manual',
       cropConfirmed: false,
-      glareLevel: 'none',
-      rotation: 0,
-      effects: { ...SMART_EFFECTS },
-      adjustments: DEFAULT_ADJUSTMENTS,
+      effects: { ...SMART_EFFECTS, color: 'grayscale' },
+      adjustments: { ...DEFAULT_ADJUSTMENTS, whiteningStrength: 40 },
       thumbnail: new Blob(['thumbnail'], { type: 'image/jpeg' }),
-      createdAt: now,
-      updatedAt: now,
     })
-
-    const firstPage = makePage('page-1', 0)
     await db.projects.put(project)
-    await bulkPutPages([makePage('page-2', 1), firstPage])
+    await bulkPutPages([makePage({ id: 'page-2', order: 1 }), firstPage])
     const rawPage = await db.pages.get('page-1')
     expect(rawPage?.source.data.byteLength).toBeGreaterThan(0)
     expect(rawPage?.thumbnail?.data.byteLength).toBeGreaterThan(0)
@@ -314,18 +237,19 @@ describe('local scan repository', () => {
     expect(stored.pages.map((page) => page.id)).toEqual(['page-1', 'page-2'])
     expect(stored.pages[0].source).toBeInstanceOf(Blob)
     expect(stored.pages[0].thumbnail).toBeInstanceOf(Blob)
+    expect(stored.pages[0]).toMatchObject({
+      cornerSource: 'manual',
+      cropConfirmed: false,
+      effects: firstPage.effects,
+      adjustments: firstPage.adjustments,
+    })
 
     const summary = await getProjectPageSummary(project.id)
     expect(summary.pageCount).toBe(2)
     expect(await summary.thumbnail?.text()).toBe('thumbnail')
 
-    const { whiteningStrength: _legacyMissingField, ...legacyAdjustments } = DEFAULT_ADJUSTMENTS
-    await db.pages.update('page-1', { adjustments: legacyAdjustments as EnhancementSettings })
-    const migrated = await getProjectWithPages(project.id)
-    expect(migrated.pages[0].adjustments.whiteningStrength).toBe(DEFAULT_WHITENING_STRENGTH)
-
     const sourceRead = vi.spyOn(firstPage.source, 'arrayBuffer')
-    await updatePageMetadata({ ...firstPage, rotation: 90, updatedAt: now + 1 })
+    await updatePageMetadata({ ...firstPage, rotation: 90, updatedAt: firstPage.updatedAt + 1 })
     expect(sourceRead).not.toHaveBeenCalled()
     const metadataUpdated = await getProjectWithPages(project.id)
     expect(metadataUpdated.pages[0].rotation).toBe(90)
@@ -342,14 +266,7 @@ describe('local scan repository', () => {
   })
 
   it('clears all scan history and exposes no model stores', async () => {
-    const now = Date.now()
-    await db.projects.put({
-      id: 'project-to-clear',
-      mode: 'document',
-      name: '待清理文档',
-      createdAt: now,
-      updatedAt: now,
-    })
+    await db.projects.put(makeProject({ id: 'project-to-clear', name: '待清理文档' }))
 
     await clearScannerData()
 

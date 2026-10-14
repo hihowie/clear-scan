@@ -107,9 +107,7 @@ function CropControls({
       ? '预识别结果待确认'
       : page.cornerSource === 'manual'
         ? '已手动调整，等待确认'
-        : page.cornerSource === 'fallback'
-          ? '需要手动调整'
-          : '需要人工确认'
+        : '需要手动调整'
 
   return (
     <div className="space-y-5">

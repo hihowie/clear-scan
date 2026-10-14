@@ -1,54 +1,17 @@
 import Dexie, { type EntityTable } from 'dexie'
-import {
-  DEFAULT_ADJUSTMENTS,
-  ORIGINAL_EFFECTS,
-  SMART_EFFECTS,
-  type EnhancementEffects,
-  type ScanPage,
-  type ScanProject,
-} from './types'
+import type { ScanPage, ScanProject } from './types'
 
 interface StoredBinary {
   data: ArrayBuffer
   type: string
 }
 
-type LegacyFilter =
-  | 'original'
-  | 'smart'
-  | 'deshadow'
-  | 'ai-deshadow'
-  | 'deglare'
-  | 'grayscale'
-  | 'black-white'
-  | 'sharpen'
-  | 'vivid'
-
-type StoredEffects = Omit<EnhancementEffects, 'shadow' | 'color'> & {
-  shadow: EnhancementEffects['shadow'] | 'ai-deshadow'
-  color: EnhancementEffects['color'] | 'vivid'
-}
-
-type StoredScanPage = Omit<ScanPage, 'source' | 'thumbnail' | 'effects'> & {
+type StoredScanPage = Omit<ScanPage, 'source' | 'thumbnail'> & {
   source: StoredBinary
   thumbnail?: StoredBinary
-  effects?: StoredEffects
-  filter?: LegacyFilter
 }
 
-type StoredPageMetadata = Omit<StoredScanPage, 'id' | 'source' | 'thumbnail' | 'order' | 'filter'>
-
-const LEGACY_FILTER_EFFECTS: Record<LegacyFilter, EnhancementEffects> = {
-  original: ORIGINAL_EFFECTS,
-  smart: SMART_EFFECTS,
-  deshadow: { ...ORIGINAL_EFFECTS, shadow: 'deshadow' },
-  'ai-deshadow': { ...ORIGINAL_EFFECTS, shadow: 'deshadow' },
-  deglare: { ...ORIGINAL_EFFECTS, glare: 'deglare' },
-  grayscale: { ...ORIGINAL_EFFECTS, color: 'grayscale' },
-  'black-white': { ...ORIGINAL_EFFECTS, color: 'black-white' },
-  sharpen: { ...ORIGINAL_EFFECTS, detail: 'sharpen' },
-  vivid: { ...ORIGINAL_EFFECTS, color: 'enhanced-color' },
-}
+type StoredPageMetadata = Omit<StoredScanPage, 'id' | 'source' | 'thumbnail' | 'order'>
 
 class ScannerDatabase extends Dexie {
   projects!: EntityTable<ScanProject, 'id'>
@@ -129,33 +92,11 @@ function pageMetadata(page: ScanPage): StoredPageMetadata {
 }
 
 function decodePage(page: StoredScanPage): ScanPage {
-  const {
-    source,
-    thumbnail,
-    adjustments,
-    cornerSource,
-    cropConfirmed,
-    effects,
-    filter,
-    ...metadata
-  } = page
-  const storedEffects = effects ?? (filter ? LEGACY_FILTER_EFFECTS[filter] : ORIGINAL_EFFECTS)
+  const { source, thumbnail, ...metadata } = page
   return {
     ...metadata,
     source: decodeBinary(source),
     thumbnail: thumbnail ? decodeBinary(thumbnail) : undefined,
-    cornerSource: cornerSource ?? 'unverified',
-    cropConfirmed: cropConfirmed ?? false,
-    // Preserve legacy presets and map retired effects to their supported equivalents.
-    effects: {
-      ...storedEffects,
-      shadow: storedEffects.shadow === 'ai-deshadow' ? 'deshadow' : storedEffects.shadow,
-      color: storedEffects.color === 'vivid' ? 'enhanced-color' : storedEffects.color,
-    },
-    adjustments: {
-      ...DEFAULT_ADJUSTMENTS,
-      ...adjustments,
-    },
   }
 }
 

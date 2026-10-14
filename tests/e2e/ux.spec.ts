@@ -5,11 +5,25 @@ import { holdNextThumbnailEncoding, waitForScannerReady } from './helpers'
 
 const documentFixture = fs.readFileSync(path.resolve('tests/e2e/fixtures/document.png'))
 
+test.use({ launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } })
+
 async function expectNoHorizontalOverflow(page: Page) {
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   )
   expect(overflow).toBeLessThanOrEqual(1)
+}
+
+async function readHeaderLayout(page: Page) {
+  return page
+    .getByRole('banner', { includeHidden: true })
+    .locator('a:visible, button:visible, nav:visible')
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const { x, width } = element.getBoundingClientRect()
+        return { x, width }
+      }),
+    )
 }
 
 async function storedPageState(page: Page, sourceName: string) {
@@ -35,32 +49,102 @@ async function storedPageState(page: Page, sourceName: string) {
   }, sourceName)
 }
 
-async function seedEditableProject(page: Page, legacy = false) {
+async function seedEditableProject(page: Page) {
   await page.goto('/')
-  await page.evaluate(
-    async ({ bytes, legacy }) => {
-      const dbPath = '/src/lib/db.ts'
-      const fixturePath = '/tests/support/scan-fixtures.ts'
-      const { db, putPage } = await import(dbPath)
-      const { makePage, makeProject } = await import(fixturePath)
-      const source = new Blob([new Uint8Array(bytes)], { type: 'image/png' })
-      const bitmap = await createImageBitmap(source)
-      await db.projects.put(makeProject())
-      await putPage(makePage({ source, width: bitmap.width, height: bitmap.height }))
-      bitmap.close()
-      if (legacy) {
-        await db.pages.update('page-1', {
-          effects: undefined,
-          filter: 'grayscale',
-          cropConfirmed: undefined,
-          cornerSource: undefined,
-        })
-      }
-    },
-    { bytes: Array.from(documentFixture), legacy },
-  )
+  await page.evaluate(async (bytes) => {
+    const dbPath = '/src/lib/db.ts'
+    const fixturePath = '/tests/support/scan-fixtures.ts'
+    const { db, putPage } = await import(dbPath)
+    const { makePage, makeProject } = await import(fixturePath)
+    const source = new Blob([new Uint8Array(bytes)], { type: 'image/png' })
+    const bitmap = await createImageBitmap(source)
+    await db.projects.put(makeProject())
+    await putPage(makePage({ source, width: bitmap.width, height: bitmap.height }))
+    bitmap.close()
+  }, Array.from(documentFixture))
   await page.goto('/#/project/project-1')
 }
+
+test.describe('navigation with visible scrollbars', () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'Requires desktop scrollbars')
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/')
+    // Use classic scrollbars even on systems that default to overlay scrollbars.
+    await page.addStyleTag({ content: 'html::-webkit-scrollbar { width: 16px; }' })
+  })
+
+  test('keeps the header aligned when switching between home and empty history', async ({
+    page,
+  }) => {
+    await expect(page.getByRole('heading', { name: /清晰扫描仪/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '还没有扫描记录' })).toBeVisible()
+    expect(
+      await page.evaluate(() => window.innerWidth - document.documentElement.clientWidth),
+    ).toBe(16)
+    const pageOverflowsVertically = () =>
+      page.evaluate(
+        () => document.documentElement.scrollHeight > document.documentElement.clientHeight,
+      )
+    expect(await pageOverflowsVertically()).toBe(true)
+
+    const navigation = page.getByRole('navigation', { name: '主导航', exact: true })
+    const initialLayout = await readHeaderLayout(page)
+
+    await navigation.getByRole('link', { name: '扫描记录', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '扫描记录', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '还没有扫描记录' })).toBeVisible()
+    expect(await pageOverflowsVertically()).toBe(false)
+    expect(await readHeaderLayout(page)).toEqual(initialLayout)
+    await expectNoHorizontalOverflow(page)
+
+    await navigation.getByRole('link', { name: '首页', exact: true }).click()
+    await expect(page.getByRole('heading', { name: /清晰扫描仪/ })).toBeVisible()
+    expect(await pageOverflowsVertically()).toBe(true)
+    expect(await readHeaderLayout(page)).toEqual(initialLayout)
+    await expectNoHorizontalOverflow(page)
+  })
+
+  test('keeps the header aligned when filtering history and toggling its dialog', async ({
+    page,
+  }) => {
+    await page.evaluate(async () => {
+      const dbPath = '/src/lib/db.ts'
+      const fixturePath = '/tests/support/scan-fixtures.ts'
+      const { db } = await import(dbPath)
+      const { makeProject } = await import(fixturePath)
+      await db.projects.bulkPut(
+        Array.from({ length: 8 }, (_, index) => makeProject({ id: `project-${index}` })),
+      )
+    })
+    await page
+      .getByRole('navigation', { name: '主导航', exact: true })
+      .getByRole('link', { name: '扫描记录', exact: true })
+      .click()
+    await expect(page.getByRole('article')).toHaveCount(8)
+    const initialLayout = await readHeaderLayout(page)
+
+    for (const query of ['', 'no matching projects']) {
+      await page.getByRole('textbox', { name: '搜索扫描项目' }).fill(query)
+      await expect(page.getByRole('article')).toHaveCount(query ? 0 : 8)
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollHeight > document.documentElement.clientHeight,
+        ),
+      ).toBe(!query)
+      expect(await readHeaderLayout(page)).toEqual(initialLayout)
+
+      await page.getByRole('button', { name: '清空所有历史数据' }).click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+      await expect(page.locator('body')).toHaveAttribute('data-scroll-locked', '1')
+      expect(await readHeaderLayout(page)).toEqual(initialLayout)
+
+      await page.getByRole('button', { name: '取消', exact: true }).click()
+      await expect(page.locator('body')).not.toHaveAttribute('data-scroll-locked')
+      expect(await readHeaderLayout(page)).toEqual(initialLayout)
+    }
+  })
+})
 
 test('scan project names stay inline on desktop and save direct edits on all screens', async ({
   page,
@@ -155,11 +239,11 @@ test('desktop and mobile shells expose useful empty, install, and fallback state
   } else {
     await expect(sourceLink).toHaveText('源代码')
     const navigationBox = await page.getByRole('navigation', { name: '主导航' }).boundingBox()
-    const viewport = page.viewportSize()
+    const headerBox = await page.getByRole('banner').boundingBox()
     expect(navigationBox).not.toBeNull()
-    expect(viewport).not.toBeNull()
+    expect(headerBox).not.toBeNull()
     expect(
-      Math.abs(navigationBox!.x + navigationBox!.width / 2 - viewport!.width / 2),
+      Math.abs(navigationBox!.x + navigationBox!.width / 2 - headerBox!.x - headerBox!.width / 2),
     ).toBeLessThanOrEqual(1)
   }
   await page.goto('/#/settings')
@@ -477,20 +561,4 @@ test.describe('project persistence across browser navigation', () => {
       expect((await storedPageState(page, 'page.png')).color).toBe('grayscale')
     })
   }
-
-  test('opens a legacy project and preserves its filter after crop confirmation', async ({
-    page,
-  }) => {
-    const errors: string[] = []
-    page.on('pageerror', (error) => errors.push(error.message))
-    await seedEditableProject(page, true)
-    const confirmCrop = page.getByRole('button', { name: '确认裁剪' })
-    await expect(confirmCrop).toBeEnabled()
-    await confirmCrop.click()
-    await expect(page.getByRole('button', { name: '灰度', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
-    expect(errors).toEqual([])
-  })
 })

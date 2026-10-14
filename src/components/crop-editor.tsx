@@ -340,9 +340,7 @@ export function CropEditor({
             ? '已预识别边缘，请人工确认'
             : cornerSource === 'manual'
               ? '已手动调整边缘'
-              : cornerSource === 'fallback'
-                ? '未可靠识别，请拖动四角'
-                : '请人工确认文档边缘'}
+              : '未可靠识别，请拖动四角'}
         </Badge>
       </div>
     </div>

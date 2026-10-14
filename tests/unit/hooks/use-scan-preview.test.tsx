@@ -1,33 +1,9 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { toast } from 'sonner'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_QUAD } from '@/lib/geometry'
 import { scannerClient } from '@/lib/scanner-client'
-import { DEFAULT_ADJUSTMENTS, SMART_EFFECTS, type ScanPage } from '@/lib/types'
 import { useScanPreview } from '@/hooks/use-scan-preview'
-
-function makePage(id = 'page-1', brightness = 0): ScanPage {
-  return {
-    id,
-    projectId: 'project-1',
-    order: 0,
-    role: 'page',
-    source: new Blob(['source'], { type: 'image/jpeg' }),
-    sourceName: `${id}.jpg`,
-    width: 1200,
-    height: 900,
-    corners: DEFAULT_QUAD,
-    confidence: 0.9,
-    cornerSource: 'detected',
-    cropConfirmed: true,
-    glareLevel: 'none',
-    rotation: 0,
-    effects: { ...SMART_EFFECTS },
-    adjustments: { ...DEFAULT_ADJUSTMENTS, brightness },
-    createdAt: 1,
-    updatedAt: 1,
-  }
-}
+import { makePage } from '../../support/scan-fixtures'
 
 afterEach(() => {
   cleanup()
@@ -53,7 +29,7 @@ describe('useScanPreview', () => {
     expect(result.current.isCurrent).toBe(true)
     expect(render).toHaveBeenCalledTimes(1)
 
-    rerender({ page: makePage('page-1', 12) })
+    rerender({ page: { ...firstPage, adjustments: { ...firstPage.adjustments, brightness: 12 } } })
     expect(result.current.isCurrent).toBe(false)
     await waitFor(() => expect(result.current.preview?.url).toBe('blob:preview-2'))
     expect(revokeUrl).toHaveBeenCalledWith('blob:preview-1')
@@ -80,7 +56,10 @@ describe('useScanPreview', () => {
 
     await waitFor(() => expect(render).toHaveBeenCalledTimes(1))
     const signal = render.mock.calls[0][2]?.signal
-    rerender({ page: makePage('page-1', 10), enabled: true })
+    rerender({
+      page: { ...firstPage, adjustments: { ...firstPage.adjustments, brightness: 10 } },
+      enabled: true,
+    })
     expect(signal?.aborted).toBe(true)
     await waitFor(() => expect(render).toHaveBeenCalledTimes(2))
 
@@ -94,7 +73,7 @@ describe('useScanPreview', () => {
     })
     expect(result.current.preview?.url).toBe('blob:preview')
 
-    rerender({ page: makePage('page-2'), enabled: false })
+    rerender({ page: makePage({ id: 'page-2' }), enabled: false })
     expect(result.current.preview).toBeUndefined()
     expect(revokeUrl).toHaveBeenCalledWith('blob:preview')
   })

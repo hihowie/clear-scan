@@ -1,7 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
-import { DEFAULT_QUAD } from '@/lib/geometry'
-import { DEFAULT_ADJUSTMENTS, SMART_EFFECTS, type ScanPage, type ScanProject } from '@/lib/types'
 
 const { renderMock } = vi.hoisted(() => ({
   renderMock: vi.fn(),
@@ -12,35 +10,12 @@ vi.mock('@/lib/scanner-client', () => ({
 }))
 
 import { exportProject } from '@/lib/exporters'
-import { makeProject } from '../../support/scan-fixtures'
+import { makePage, makeProject } from '../../support/scan-fixtures'
 
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
-
-function makePage(id: string, order: number): ScanPage {
-  return {
-    id,
-    projectId: 'project-1',
-    order,
-    role: 'page',
-    source: new Blob([id], { type: 'image/jpeg' }),
-    sourceName: `${id}.jpg`,
-    width: 1200,
-    height: 900,
-    corners: DEFAULT_QUAD,
-    confidence: 0.9,
-    cornerSource: 'detected',
-    cropConfirmed: true,
-    glareLevel: 'none',
-    rotation: 0,
-    effects: { ...SMART_EFFECTS },
-    adjustments: { ...DEFAULT_ADJUSTMENTS },
-    createdAt: order,
-    updatedAt: order,
-  }
-}
 
 describe('image package export', () => {
   it('keeps full render settings and stores already-compressed JPEG entries', async () => {
@@ -50,17 +25,9 @@ describe('image package export', () => {
       width: 3000,
       height: 2250,
     })
-    const project: ScanProject = {
-      id: 'project-1',
-      name: '测试文档',
-      mode: 'document',
-      createdAt: 1,
-      updatedAt: 1,
-    }
-
     const result = await exportProject(
-      project,
-      [makePage('page-2', 1), makePage('page-1', 0)],
+      makeProject(),
+      [makePage({ id: 'page-2', order: 1 }), makePage()],
       'zip',
       'content',
     )
@@ -103,18 +70,11 @@ describe('ID card image export', () => {
         .mockImplementation((callback, type) => {
           callback(new Blob(['sheet'], { type }))
         })
-      const project: ScanProject = {
-        id: 'project-1',
-        name: '身份证',
-        mode: 'id-card',
-        createdAt: 1,
-        updatedAt: 1,
-      }
       const result = await exportProject(
-        project,
+        makeProject({ name: '身份证', mode: 'id-card' }),
         [
-          { ...makePage('front', 0), role: 'front' },
-          { ...makePage('back', 1), role: 'back' },
+          makePage({ id: 'front', role: 'front' }),
+          makePage({ id: 'back', order: 1, role: 'back' }),
         ],
         format,
         'a4',
@@ -149,7 +109,7 @@ describe('content-sized PDF export', () => {
       ),
     )
     renderMock.mockResolvedValue({ blob: new Blob([png], { type: 'image/png' }), width, height })
-    const result = await exportProject(makeProject(), [makePage('page-1', 0)], 'pdf', 'content')
+    const result = await exportProject(makeProject(), [makePage()], 'pdf', 'content')
     const pdf = await PDFDocument.load(await result.blob.arrayBuffer())
     const size = pdf.getPages()[0].getSize()
     expect(size.width).toBeCloseTo(pdfWidth)
