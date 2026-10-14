@@ -51,7 +51,7 @@ export function ScanPageHeader({
         <Button variant="ghost" size="icon" onClick={onBack} aria-label={messages.backHome}>
           <ArrowLeft />
         </Button>
-        <div className="flex items-center gap-2 whitespace-nowrap">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 whitespace-nowrap">
           <Badge variant="secondary">{modeLabels[mode]}</Badge>
           <span className="text-[10px] font-semibold text-muted-foreground">
             {messages.pageCount(pages.length)}

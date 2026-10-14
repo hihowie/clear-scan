@@ -119,7 +119,7 @@ export function CameraDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl bg-[#0c1813] p-3 text-white">
+      <DialogContent className="max-w-3xl bg-workspace p-3 text-white">
         <DialogHeader className="px-3 pt-2">
           <DialogTitle className="text-white">{messages.cameraTitle}</DialogTitle>
         </DialogHeader>
@@ -138,11 +138,11 @@ export function CameraDialog({
             </div>
           )}
           {!error && !loading && (
-            <div className="pointer-events-none absolute inset-[9%] rounded-lg border border-emerald-300/70">
-              <span className="absolute -left-px -top-px size-7 border-l-2 border-t-2 border-emerald-300" />
-              <span className="absolute -right-px -top-px size-7 border-r-2 border-t-2 border-emerald-300" />
-              <span className="absolute -bottom-px -left-px size-7 border-b-2 border-l-2 border-emerald-300" />
-              <span className="absolute -bottom-px -right-px size-7 border-b-2 border-r-2 border-emerald-300" />
+            <div className="pointer-events-none absolute inset-[9%] rounded-lg border border-crop-guide/70">
+              <span className="absolute -left-px -top-px size-7 border-l-2 border-t-2 border-crop-guide" />
+              <span className="absolute -right-px -top-px size-7 border-r-2 border-t-2 border-crop-guide" />
+              <span className="absolute -bottom-px -left-px size-7 border-b-2 border-l-2 border-crop-guide" />
+              <span className="absolute -bottom-px -right-px size-7 border-b-2 border-r-2 border-crop-guide" />
             </div>
           )}
         </div>

@@ -107,7 +107,7 @@ export const en = {
   cropRequiredStatus: 'Manual adjustment needed',
   confirmCorners: 'Confirm all four corners',
   cropInstructions:
-    'Drag the green handles outside the frame to align the indicated corners with your document. Use the magnifier for precise placement.',
+    'Drag the blue handles outside the frame to align the indicated corners with your document. Use the magnifier for precise placement.',
   cropTips: 'Cropping tips',
   cropTipInside: '- Keep edges slightly inside the document to exclude the background',
   cropTipPassport: '- Include the full binding when scanning a passport spread',

@@ -221,7 +221,7 @@ export function FilterPanel({
             {activePreset === 'custom' ? messages.customEffects : messages.recommendedPreset}
           </Badge>
         </div>
-        <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-muted p-1.5">
+        <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-muted/60 p-1">
           {[
             {
               value: 'original' as const,
@@ -232,22 +232,23 @@ export function FilterPanel({
               label: messages.smartPreset,
             },
           ].map((preset) => (
-            <button
+            <Button
               key={preset.value}
               type="button"
+              variant="ghost"
               aria-label={preset.label}
               aria-pressed={activePreset === preset.value}
               onClick={() => onPresetApply(preset.value)}
               className={cn(
-                'flex h-10 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-bold transition',
+                'h-10 gap-1.5 rounded-lg px-3 text-xs',
                 activePreset === preset.value
-                  ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
-                  : 'text-muted-foreground hover:bg-background/65',
+                  ? 'bg-secondary text-primary shadow-sm hover:bg-secondary hover:text-primary'
+                  : 'text-muted-foreground hover:bg-card',
               )}
             >
               {activePreset === preset.value && <Check className="size-3.5 text-primary" />}
               {preset.label}
-            </button>
+            </Button>
           ))}
         </div>
       </section>
@@ -261,31 +262,32 @@ export function FilterPanel({
         </div>
         <div className="space-y-3">
           {effectGroups.map((group) => (
-            <fieldset key={group.key} className="rounded-2xl border border-border/80 p-3">
+            <fieldset key={group.key} className="rounded-xl border border-border/50 p-3">
               <legend className="px-1 text-xs font-bold">{group.label}</legend>
               <div className="mt-1 grid grid-cols-2 gap-1.5">
                 {group.options.map((option) => {
                   const selected = effects[group.key] === option.value
                   return (
-                    <button
+                    <Button
                       key={option.value}
                       type="button"
+                      variant="ghost"
                       aria-label={option.label}
                       aria-pressed={selected}
                       onClick={() => onEffectChange(group.key, option.value)}
                       className={cn(
-                        'relative min-h-10 rounded-xl border px-2 py-2 text-xs font-semibold transition',
+                        'h-auto min-h-10 min-w-0 rounded-lg border px-2 py-2 text-xs whitespace-normal',
                         group.key === 'shadow' && option.value === 'none' && 'col-span-2',
                         selected
-                          ? 'border-primary bg-primary/8 text-primary ring-1 ring-primary/15'
-                          : 'border-transparent bg-muted/70 text-muted-foreground hover:border-primary/20 hover:text-foreground',
+                          ? 'border-primary/20 bg-secondary text-primary hover:bg-secondary hover:text-primary'
+                          : 'border-transparent text-muted-foreground hover:bg-muted',
                       )}
                     >
-                      <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap">
-                        {selected && <Check className="size-3.5" />}
-                        {option.label}
+                      <span className="inline-flex min-w-0 items-center justify-center gap-1.5">
+                        {selected && <Check className="size-3.5 shrink-0" />}
+                        <span>{option.label}</span>
                       </span>
-                    </button>
+                    </Button>
                   )
                 })}
               </div>
@@ -294,7 +296,7 @@ export function FilterPanel({
         </div>
       </section>
 
-      <details className="group relative overflow-hidden rounded-2xl border border-border/80 bg-background">
+      <details className="group relative overflow-hidden rounded-xl border border-border/50 bg-background">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold [&::-webkit-details-marker]:hidden">
           <span className="flex items-center gap-2">
             <SlidersHorizontal className="size-4 text-primary" />

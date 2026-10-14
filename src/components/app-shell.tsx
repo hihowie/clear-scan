@@ -131,7 +131,7 @@ export function AppShell() {
           }}
           className="absolute left-1/2 top-0 flex -translate-x-1/2 -translate-y-5 flex-col items-center gap-1 text-[10px] font-semibold text-primary"
         >
-          <span className="grid size-12 place-items-center rounded-2xl bg-primary text-white shadow-[0_8px_24px_rgba(8,127,91,.28)]">
+          <span className="grid size-12 place-items-center rounded-2xl bg-primary text-white shadow-lg shadow-primary/25">
             <ScanLine className="size-5" />
           </span>
           {messages.scan}

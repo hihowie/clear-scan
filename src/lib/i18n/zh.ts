@@ -104,7 +104,7 @@ export const zh = {
   cropRequiredStatus: '需要手动调整',
   confirmCorners: '确认四个角点',
   cropInstructions:
-    '拖动边框外侧的绿色圆柄，让短线所指的角点贴合证件或纸张；拖动时可通过放大镜精确对齐。',
+    '拖动边框外侧的蓝色圆柄, 让短线所指的角点贴合证件或纸张; 拖动时可通过放大镜精确对齐.',
   cropTips: '裁剪小技巧',
   cropTipInside: '· 边缘宁可稍微向内，不要带入桌面背景',
   cropTipPassport: '· 护照展开双页应包含完整装订线',

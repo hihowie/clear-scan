@@ -207,6 +207,19 @@ test('scan project names stay inline on desktop and save direct edits on all scr
     await expect(projectName).toBeFocused()
     await expectNoHorizontalOverflow(page)
     await expect(page.getByRole('button', { name: '导出', exact: true })).toBeVisible()
+
+    await page.getByRole('button', { name: '切换为英语' }).click()
+    const pageCount = page.getByText('1 page', { exact: true })
+    const exportButton = page.getByRole('button', { name: 'Export', exact: true })
+    await expect(pageCount).toBeVisible()
+    const [countBox, exportBox] = await Promise.all([
+      pageCount.boundingBox(),
+      exportButton.boundingBox(),
+    ])
+    expect(countBox).not.toBeNull()
+    expect(exportBox).not.toBeNull()
+    expect(countBox!.x + countBox!.width).toBeLessThanOrEqual(exportBox!.x)
+    await exportButton.click({ trial: true })
   }
 })
 

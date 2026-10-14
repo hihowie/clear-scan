@@ -70,7 +70,7 @@ export function ScanProcessingOverlay({
   const normalizedProgress = Math.max(0, Math.min(100, progress))
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-[#081711]/55 p-6 backdrop-blur-sm"
+      className="fixed inset-0 z-50 grid place-items-center bg-workspace/55 p-6 backdrop-blur-sm"
       role="status"
       aria-live="polite"
     >

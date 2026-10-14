@@ -5,8 +5,8 @@
   "name": "Clear Scan",
   "short_name": "Clear Scan",
   "description": "An ID and document scanner that processes every image on your device",
-  "theme_color": "#087f5b",
-  "background_color": "#f7f8f4",
+  "theme_color": "#2563eb",
+  "background_color": "#f8fafc",
   "display": "standalone",
   "lang": "en",
   "icons": [

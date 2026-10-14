@@ -16,7 +16,7 @@ export function ProjectCard({ summary, onMenu }: { summary: ProjectSummary; onMe
   }
   const meta = modeMeta[summary.project.mode]
   return (
-    <article className="group overflow-hidden rounded-2xl border border-border/80 bg-card transition hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(20,50,38,.08)]">
+    <article className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md">
       <Link to={`/project/${summary.project.id}`} className="block">
         <div className="relative aspect-[4/3] overflow-hidden bg-muted">
           {summary.thumbnailUrl ? (

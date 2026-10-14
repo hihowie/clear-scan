@@ -5,8 +5,8 @@
   "name": "清晰扫描",
   "short_name": "清晰扫描",
   "description": "所有图片都在设备本地处理的证件与文档扫描器",
-  "theme_color": "#087f5b",
-  "background_color": "#f7f8f4",
+  "theme_color": "#2563eb",
+  "background_color": "#f8fafc",
   "display": "standalone",
   "lang": "zh-CN",
   "icons": [

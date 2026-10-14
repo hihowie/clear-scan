@@ -12,7 +12,7 @@ export function BrandLogo({
   useLocale()
   return (
     <div className={cn('flex items-center gap-2.5', className)}>
-      <span className="relative grid size-9 place-items-center overflow-hidden rounded-xl bg-primary shadow-[0_6px_18px_rgba(8,127,91,.22)]">
+      <span className="relative grid size-9 place-items-center overflow-hidden rounded-xl bg-primary shadow-sm shadow-primary/20">
         <svg viewBox="0 0 36 36" className="size-8 text-white" aria-hidden="true">
           <path
             d="M10 6H6v7M26 6h4v7M10 30H6v-7M26 30h4v-7"

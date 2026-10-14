@@ -234,8 +234,7 @@ export function CropEditor({
           <rect width="100" height="100" fill="rgba(0,0,0,.52)" mask="url(#crop-mask)" />
           <polygon
             points={polygon}
-            fill="rgba(34,197,94,.035)"
-            stroke="#3ee49f"
+            className="fill-primary/5 stroke-crop-guide"
             strokeWidth="0.55"
             vectorEffect="non-scaling-stroke"
           />
@@ -309,7 +308,7 @@ export function CropEditor({
         {magnifier && activeDrag && (
           <div
             data-testid="crop-magnifier"
-            className="pointer-events-none absolute z-30 overflow-hidden rounded-full border-2 border-white bg-[#12241c] shadow-[0_8px_28px_rgba(0,0,0,.6)] ring-2 ring-primary/80"
+            className="pointer-events-none absolute z-30 overflow-hidden rounded-full border-2 border-white bg-workspace shadow-[0_8px_28px_rgba(0,0,0,.6)] ring-2 ring-primary/80"
             style={{
               left: magnifier.left,
               top: magnifier.top,
@@ -337,7 +336,11 @@ export function CropEditor({
         )}
         <Badge
           variant={cornerSource === 'detected' || cornerSource === 'manual' ? 'default' : 'warning'}
-          className="pointer-events-none absolute -top-10 left-0 shadow-sm"
+          className={cn(
+            'pointer-events-none absolute -top-10 left-0 shadow-sm',
+            (cornerSource === 'detected' || cornerSource === 'manual') &&
+              'border-crop-guide/30 bg-workspace/90 text-crop-guide',
+          )}
         >
           {cornerSource === 'detected'
             ? messages.cropDetectedHint
