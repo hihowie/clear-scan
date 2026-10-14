@@ -6,6 +6,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   fullyParallel: false,
   use: {
+    locale: 'zh-CN',
     baseURL: 'http://127.0.0.1:4173',
     trace: 'retain-on-failure',
   },

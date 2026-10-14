@@ -2,11 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_QUAD } from '@/lib/geometry'
 import {
   ENGINE_INITIALIZATION_TIMEOUT_MS,
-  ENGINE_TIMEOUT_MESSAGE,
   ScannerClient,
   createRenderCacheKey,
   isAbortError,
+  isEngineTimeout,
 } from '@/lib/scanner-client'
+import { messages, setLocale } from '@/lib/i18n'
 import type { ScannerWorkerRequest } from '@/lib/types'
 import { makePage } from '../../support/scan-fixtures'
 
@@ -200,7 +201,7 @@ describe('scanner request scheduling', () => {
     expect((await rerendered).blob).not.toBe(rendered.blob)
   })
 
-  it('stops a timed-out engine initialization and allows retrying it', async () => {
+  it('keeps timeout identity and retries in the selected language', async () => {
     vi.useFakeTimers()
     try {
       const client = new ScannerClient()
@@ -210,18 +211,21 @@ describe('scanner request scheduling', () => {
 
       await vi.advanceTimersByTimeAsync(ENGINE_INITIALIZATION_TIMEOUT_MS)
 
-      expect(await failure).toMatchObject({ message: ENGINE_TIMEOUT_MESSAGE })
+      expect(await failure).toMatchObject({ message: messages.engineTimeout })
+      setLocale('en')
+      expect(isEngineTimeout(await failure)).toBe(true)
       expect(firstWorker.terminated).toBe(true)
       expect(client.isReady).toBe(false)
 
       const retry = client.prewarm()
       const secondWorker = WorkerMock.instances[1]
-      expect(secondWorker.messages[0].type).toBe('init')
+      expect(secondWorker.messages[0]).toMatchObject({ type: 'init', locale: 'en' })
       secondWorker.respond({ id: secondWorker.messages[0].id, type: 'ready' })
 
       await retry
       expect(client.isReady).toBe(true)
     } finally {
+      setLocale('zh-CN')
       vi.useRealTimers()
     }
   })
@@ -242,7 +246,7 @@ describe('scanner request scheduling', () => {
       expect(settled).toBe(false)
 
       await vi.advanceTimersByTimeAsync(ENGINE_INITIALIZATION_TIMEOUT_MS - 90_000)
-      expect(await failure).toMatchObject({ message: ENGINE_TIMEOUT_MESSAGE })
+      expect(await failure).toMatchObject({ message: messages.engineTimeout })
       expect(WorkerMock.instances[0].terminated).toBe(true)
     } finally {
       vi.useRealTimers()

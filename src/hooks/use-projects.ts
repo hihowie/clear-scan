@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { db, getProjectPageSummary } from '@/lib/db'
 import type { ScanProject } from '@/lib/types'
+import { messages } from '@/lib/i18n'
 
 export interface ProjectSummary {
   project: ScanProject
@@ -55,9 +56,9 @@ export function useProjectSummaries(limit?: number) {
 
   useEffect(() => {
     void load().catch((reason: unknown) => {
-      toast.error('扫描记录读取失败', {
+      toast.error(messages.historyReadFailed, {
         id: 'project-summaries-load-error',
-        description: reason instanceof Error ? reason.message : '浏览器无法读取本地存储',
+        description: reason instanceof Error ? reason.message : messages.storageReadFailed,
       })
     })
     return () => {

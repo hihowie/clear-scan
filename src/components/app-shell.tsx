@@ -4,19 +4,22 @@ import { Code2, FolderClock, Home, ScanLine } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { BrandLogo } from './brand-logo'
+import { LanguageButton } from './language-button'
 import { InstallButton, OnlineBadge, PwaLifecycle } from './pwa-controls'
 import { RouteLoadingOverlay } from './route-loading-overlay'
 import { Button } from '@/components/ui/button'
 import { ScannerNavigationContext } from '@/hooks/use-scanner-navigation'
 import { hasCachedEngineAsset } from '@/lib/engine-cache'
 import { cn } from '@/lib/utils'
-
-const navItems = [
-  { to: '/', label: '首页', icon: Home, exact: true },
-  { to: '/history', label: '扫描记录', icon: FolderClock },
-]
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 export function AppShell() {
+  useLocale()
+  const navItems = [
+    { to: '/', label: messages.home, icon: Home, exact: true },
+    { to: '/history', label: messages.history, icon: FolderClock },
+  ]
   const location = useLocation()
   const navigate = useNavigate()
   const [scannerOpening, setScannerOpening] = useState(false)
@@ -45,12 +48,12 @@ export function AppShell() {
       <PwaLifecycle />
       <header className="sticky top-0 z-40 h-16 border-b border-border/70 bg-background/88 backdrop-blur-xl">
         <div className="relative mx-auto flex h-full max-w-[1480px] items-center justify-between px-4 sm:px-6 lg:px-8">
-          <NavLink to="/" aria-label="清晰扫描首页">
+          <NavLink to="/" aria-label={messages.homeLink}>
             <BrandLogo />
           </NavLink>
           <nav
-            aria-label="主导航"
-            className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 md:flex"
+            aria-label={messages.mainNavigation}
+            className="hidden items-center gap-1 md:flex lg:absolute lg:left-1/2 lg:-translate-x-1/2"
           >
             {navItems.map((item) => (
               <NavLink
@@ -71,12 +74,13 @@ export function AppShell() {
           </nav>
           <div className="flex items-center gap-1 sm:gap-2">
             <OnlineBadge />
+            <LanguageButton />
             <Button asChild variant="ghost" size="icon" className="sm:hidden">
               <a
                 href="https://github.com/rmb122/clear-scan"
                 target="_blank"
                 rel="noreferrer"
-                aria-label="查看项目源代码"
+                aria-label={messages.viewSource}
               >
                 <Code2 />
               </a>
@@ -86,9 +90,9 @@ export function AppShell() {
                 href="https://github.com/rmb122/clear-scan"
                 target="_blank"
                 rel="noreferrer"
-                aria-label="查看项目源代码"
+                aria-label={messages.viewSource}
               >
-                <Code2 /> 源代码
+                <Code2 /> {messages.sourceCode}
               </a>
             </Button>
             <InstallButton />
@@ -103,7 +107,7 @@ export function AppShell() {
       </main>
 
       <nav
-        aria-label="移动端主导航"
+        aria-label={messages.mobileNavigation}
         className="safe-bottom fixed inset-x-0 bottom-0 z-40 grid h-[calc(4rem+env(safe-area-inset-bottom))] grid-cols-3 border-t border-border bg-background/95 px-4 pt-2 backdrop-blur-xl md:hidden"
       >
         <NavLink
@@ -117,7 +121,7 @@ export function AppShell() {
           }
         >
           <Home className="size-5" />
-          首页
+          {messages.home}
         </NavLink>
         <NavLink
           to="/scan/document"
@@ -130,7 +134,7 @@ export function AppShell() {
           <span className="grid size-12 place-items-center rounded-2xl bg-primary text-white shadow-[0_8px_24px_rgba(8,127,91,.28)]">
             <ScanLine className="size-5" />
           </span>
-          扫一扫
+          {messages.scan}
         </NavLink>
         <NavLink
           to="/history"
@@ -142,10 +146,16 @@ export function AppShell() {
           }
         >
           <FolderClock className="size-5" />
-          记录
+          {messages.historyShort}
         </NavLink>
       </nav>
-      <Toaster position="top-center" richColors closeButton />
+      <Toaster
+        position="top-center"
+        richColors
+        closeButton
+        containerAriaLabel={messages.notifications}
+        toastOptions={{ closeButtonAriaLabel: messages.close }}
+      />
       {scannerOpening && <RouteLoadingOverlay scanner />}
     </div>
   )

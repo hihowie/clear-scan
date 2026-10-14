@@ -3,6 +3,7 @@ import { getIdCardSheetLayout } from './id-card-layout'
 import { scannerClient } from './scanner-client'
 import type { ScanPage, ScanProject } from './types'
 import { sanitizeFileName } from './utils'
+import { messages } from './i18n'
 
 export type ExportFormat = 'jpg' | 'png' | 'pdf' | 'zip'
 export type PdfLayout = 'content' | 'a4'
@@ -28,7 +29,7 @@ async function canvasToBlob(
 ) {
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('无法生成导出图片'))),
+      (blob) => (blob ? resolve(blob) : reject(new Error(messages.exportImageFailed))),
       mimeType,
       quality,
     )
@@ -50,11 +51,11 @@ async function composeIdCard(
 ) {
   const front = pages.find((page) => page.role === 'front')
   const back = pages.find((page) => page.role === 'back')
-  if (!front || !back) throw new Error('请先完成身份证正反两面扫描')
+  if (!front || !back) throw new Error(messages.idCardIncomplete)
 
-  onProgress?.(15, '正在处理身份证人像面')
+  onProgress?.(15, messages.processingFront)
   const frontImage = await renderScanPage(front, mimeType)
-  onProgress?.(48, '正在处理身份证国徽面')
+  onProgress?.(48, messages.processingBack)
   const backImage = await renderScanPage(back, mimeType)
   const [frontBitmap, backBitmap] = await Promise.all([
     createImageBitmap(frontImage.blob),
@@ -65,7 +66,7 @@ async function composeIdCard(
   canvas.width = A4_PIXELS.width
   canvas.height = A4_PIXELS.height
   const context = canvas.getContext('2d')
-  if (!context) throw new Error('无法创建身份证排版画布')
+  if (!context) throw new Error(messages.idCardCanvasFailed)
   context.fillStyle = '#ffffff'
   context.fillRect(0, 0, canvas.width, canvas.height)
 
@@ -83,7 +84,7 @@ async function composeIdCard(
   frontBitmap.close()
   backBitmap.close()
 
-  onProgress?.(85, '正在生成 A4 大图合并页')
+  onProgress?.(85, messages.composingA4)
   const blob = await canvasToBlob(canvas, mimeType)
   return { blob, width: canvas.width, height: canvas.height }
 }
@@ -91,8 +92,8 @@ async function composeIdCard(
 async function createPdf(renderedPages: RenderedPage[], layout: PdfLayout, forceA4 = false) {
   const { PDFDocument } = await import('pdf-lib')
   const pdf = await PDFDocument.create()
-  pdf.setProducer('清晰扫描 · 本地文档扫描器')
-  pdf.setCreator('清晰扫描')
+  pdf.setProducer(messages.pdfProducer)
+  pdf.setCreator(messages.appName)
   pdf.setCreationDate(new Date())
 
   for (const rendered of renderedPages) {
@@ -141,27 +142,27 @@ export async function exportProject(
 ): Promise<ExportResult> {
   const baseName = sanitizeFileName(project.name)
   const orderedPages = [...pages].sort((left, right) => left.order - right.order)
-  if (orderedPages.length === 0) throw new Error('当前项目还没有可导出的页面')
+  if (orderedPages.length === 0) throw new Error(messages.noExportPages)
 
   if (project.mode === 'id-card') {
     const mimeType = format === 'png' ? 'image/png' : 'image/jpeg'
     const composition = await composeIdCard(orderedPages, mimeType, onProgress)
     if (format === 'pdf') {
       const pdf = await createPdf([composition], 'a4', true)
-      onProgress?.(100, 'PDF 已生成')
+      onProgress?.(100, messages.pdfGenerated)
       return { blob: pdf, fileName: `${baseName}.pdf` }
     }
-    if (format === 'zip') throw new Error('身份证模式请导出合并图片或 PDF')
-    onProgress?.(100, '合并图片已生成')
+    if (format === 'zip') throw new Error(messages.idCardExportFormat)
+    onProgress?.(100, messages.combinedImageGenerated)
     return { blob: composition.blob, fileName: `${baseName}.${format}` }
   }
 
   if (format === 'jpg' || format === 'png') {
-    if (orderedPages.length > 1) throw new Error('多页项目请使用图片包 ZIP 导出')
+    if (orderedPages.length > 1) throw new Error(messages.multiPageExportFormat)
     const mimeType = format === 'png' ? 'image/png' : 'image/jpeg'
-    onProgress?.(20, '正在处理扫描页')
+    onProgress?.(20, messages.processingPage)
     const rendered = await renderScanPage(orderedPages[0], mimeType)
-    onProgress?.(100, '图片已生成')
+    onProgress?.(100, messages.imageGenerated)
     return { blob: rendered.blob, fileName: `${baseName}.${format}` }
   }
 
@@ -169,23 +170,29 @@ export async function exportProject(
     const { default: JSZip } = await import('jszip')
     const zip = new JSZip()
     for (let index = 0; index < orderedPages.length; index += 1) {
-      onProgress?.(Math.round((index / orderedPages.length) * 85), `正在处理第 ${index + 1} 页`)
+      onProgress?.(
+        Math.round((index / orderedPages.length) * 85),
+        messages.processingPageNumber(index + 1),
+      )
       const rendered = await renderScanPage(orderedPages[index], 'image/jpeg')
       zip.file(`${baseName}-${String(index + 1).padStart(2, '0')}.jpg`, rendered.blob)
     }
     // JPEG pages are already compressed; deflating them again costs CPU while
     // usually saving almost no space, especially on mobile devices.
     const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' })
-    onProgress?.(100, '图片包已生成')
-    return { blob, fileName: `${baseName}-图片包.zip` }
+    onProgress?.(100, messages.zipGenerated)
+    return { blob, fileName: messages.zipFileName(baseName) }
   }
 
   const renderedPages: RenderedPage[] = []
   for (let index = 0; index < orderedPages.length; index += 1) {
-    onProgress?.(Math.round((index / orderedPages.length) * 82), `正在处理第 ${index + 1} 页`)
+    onProgress?.(
+      Math.round((index / orderedPages.length) * 82),
+      messages.processingPageNumber(index + 1),
+    )
     renderedPages.push(await renderScanPage(orderedPages[index], 'image/jpeg'))
   }
   const blob = await createPdf(renderedPages, layout)
-  onProgress?.(100, 'PDF 已生成')
+  onProgress?.(100, messages.pdfGenerated)
   return { blob, fileName: `${baseName}.pdf` }
 }

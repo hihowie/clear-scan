@@ -33,6 +33,8 @@ The project has no image-upload API and requires no account. Original images and
 
 ## Features
 
+The interface supports Simplified Chinese and English. By default, the app picks the first Chinese or English language in the browser's preference list. All Chinese variants use Simplified Chinese; unmatched languages fall back to English. The language button in the top right switches instantly, preserves ongoing edits, and remembers your choice. Installation names, descriptions, and shortcuts are localized too. The browser controls when an installed app's system name updates. Saved project names are kept as entered.
+
 ### Three scan modes
 
 | Mode     | Main capabilities                                                                        | Typical output                                                       |

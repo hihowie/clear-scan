@@ -1,4 +1,6 @@
 import { cn } from '@/lib/utils'
+import { locale, messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 export function BrandLogo({
   compact = false,
@@ -7,6 +9,7 @@ export function BrandLogo({
   compact?: boolean
   className?: string
 }) {
+  useLocale()
   return (
     <div className={cn('flex items-center gap-2.5', className)}>
       <span className="relative grid size-9 place-items-center overflow-hidden rounded-xl bg-primary shadow-[0_6px_18px_rgba(8,127,91,.22)]">
@@ -34,10 +37,12 @@ export function BrandLogo({
       </span>
       {!compact && (
         <span className="leading-none">
-          <span className="block text-[15px] font-bold tracking-tight">清晰扫描</span>
-          <span className="mt-1 block text-[9px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Clear Scan
-          </span>
+          <span className="block text-[15px] font-bold tracking-tight">{messages.appName}</span>
+          {locale === 'zh-CN' && (
+            <span className="mt-1 block text-[9px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Clear Scan
+            </span>
+          )}
         </span>
       )}
     </div>

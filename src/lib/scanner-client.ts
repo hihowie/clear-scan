@@ -9,8 +9,11 @@ import type {
   ScannerWorkerResponse,
 } from './types'
 import { createId } from './utils'
+import { locale, messages } from './i18n'
 
 type RequestIntent = 'init' | 'detect' | 'preview' | 'export'
+type TimeoutMessage =
+  'processingTimeout' | 'engineTimeout' | 'detectionTimeout' | 'previewTimeout' | 'exportTimeout'
 
 export interface ScannerRenderRequestOptions {
   intent?: 'preview' | 'export'
@@ -36,7 +39,7 @@ interface QueuedRequest {
   message: ScannerWorkerRequest
   intent: RequestIntent
   timeoutMs: number
-  timeoutMessage: string
+  timeoutMessage: TimeoutMessage
   sequence: number
   signal?: AbortSignal
   onProgress?: (progress: number, label: string) => void
@@ -61,13 +64,11 @@ const REQUEST_PRIORITY: Record<RequestIntent, number> = {
 const MEBIBYTE = 1024 * 1024
 const ENGINE_LOADING_PROGRESS = 5
 const ENGINE_RUNTIME_READY_PROGRESS = 22
-const DEFAULT_TIMEOUT_MESSAGE = '图像处理超时，请尝试尺寸更小的照片'
-const DETECTION_TIMEOUT_MESSAGE = '文档边缘识别超时，请尝试尺寸较小的照片'
-const PREVIEW_TIMEOUT_MESSAGE = '增强预览生成超时，请减少增强效果后重试'
-const EXPORT_TIMEOUT_MESSAGE = '导出图像处理超时，请减少增强效果后重试'
 export const ENGINE_INITIALIZATION_TIMEOUT_MS = 128_000
-export const ENGINE_DOWNLOAD_LABEL = '正在下载图像引擎（约 11 MB），可能需要一些时间'
-export const ENGINE_TIMEOUT_MESSAGE = '图像引擎加载超时'
+
+export function isEngineTimeout(error: unknown) {
+  return error instanceof Error && error.name === 'EngineTimeoutError'
+}
 
 function normalizeEngineProgress(progress: number) {
   return Math.max(
@@ -77,7 +78,7 @@ function normalizeEngineProgress(progress: number) {
 }
 
 function createAbortError() {
-  return new DOMException('图像处理请求已取消', 'AbortError')
+  return new DOMException(messages.processingAborted, 'AbortError')
 }
 
 export function isAbortError(error: unknown) {
@@ -152,7 +153,7 @@ export class ScannerClient {
         let cacheWrite=Promise.resolve();
         if(!response){
           response=await fetch(openCvUrl);
-          if(!response.ok)throw new Error('图像引擎下载失败（HTTP '+response.status+'）');
+          if(!response.ok)throw new Error(${JSON.stringify(messages.engineDownloadFailed)}+' (HTTP '+response.status+')');
           if(cache)cacheWrite=cache.put(openCvUrl,response.clone()).catch(()=>undefined);
         }
         const source=await response.blob();
@@ -183,7 +184,7 @@ export class ScannerClient {
     })
     worker.addEventListener('error', (event) => {
       if (this.worker !== worker) return
-      this.handleWorkerFailure(new Error(event.message || '图像处理 Worker 无法启动'))
+      this.handleWorkerFailure(new Error(event.message || messages.workerStartFailed))
     })
     return worker
   }
@@ -288,10 +289,10 @@ export class ScannerClient {
     request.timeout = window.setTimeout(() => {
       if (this.active !== request) return
       const timeoutMessage =
-        request.intent !== 'init' && !this.engineReady
-          ? ENGINE_TIMEOUT_MESSAGE
-          : request.timeoutMessage
-      this.rejectConsumer(request, new Error(timeoutMessage))
+        request.intent !== 'init' && !this.engineReady ? 'engineTimeout' : request.timeoutMessage
+      const error = new Error(messages[timeoutMessage])
+      if (timeoutMessage === 'engineTimeout') error.name = 'EngineTimeoutError'
+      this.rejectConsumer(request, error)
       this.active = undefined
       this.worker?.terminate()
       this.worker = undefined
@@ -301,10 +302,10 @@ export class ScannerClient {
       this.dispatchNext()
     }, request.timeoutMs)
     try {
-      this.getWorker().postMessage(request.message)
+      this.getWorker().postMessage({ ...request.message, locale })
     } catch (error) {
       this.handleWorkerFailure(
-        error instanceof Error ? error : new Error('图像处理 Worker 无法启动'),
+        error instanceof Error ? error : new Error(messages.workerStartFailed),
       )
     }
   }
@@ -314,13 +315,13 @@ export class ScannerClient {
     {
       intent,
       timeoutMs = 90_000,
-      timeoutMessage = DEFAULT_TIMEOUT_MESSAGE,
+      timeoutMessage = 'processingTimeout',
       signal,
       onProgress,
     }: {
       intent: RequestIntent
       timeoutMs?: number
-      timeoutMessage?: string
+      timeoutMessage?: TimeoutMessage
       signal?: AbortSignal
       onProgress?: (progress: number, label: string) => void
     },
@@ -396,12 +397,12 @@ export class ScannerClient {
       this.renderCache.delete(key)
       this.renderCacheBytes -= cached.blob.size
     }
-    this.worker?.postMessage({ id: createId(), type: 'invalidate-cache', pageId })
+    this.worker?.postMessage({ id: createId(), type: 'invalidate-cache', pageId, locale })
   }
 
   prewarm({ onProgress }: ScannerPrewarmRequestOptions = {}) {
     if (this.engineReady) {
-      onProgress?.(100, '图像引擎已就绪')
+      onProgress?.(100, messages.engineReady)
       return Promise.resolve()
     }
 
@@ -411,21 +412,21 @@ export class ScannerClient {
     }
 
     if (!this.warmPromise) {
-      this.reportWarmProgress(ENGINE_LOADING_PROGRESS, ENGINE_DOWNLOAD_LABEL)
+      this.reportWarmProgress(ENGINE_LOADING_PROGRESS, messages.engineDownload)
       this.warmPromise = this.request(
-        { id: createId(), type: 'init' },
+        { id: createId(), type: 'init', locale },
         {
           intent: 'init',
           timeoutMs: ENGINE_INITIALIZATION_TIMEOUT_MS,
-          timeoutMessage: ENGINE_TIMEOUT_MESSAGE,
+          timeoutMessage: 'engineTimeout',
           onProgress: (progress, label) =>
             this.reportWarmProgress(normalizeEngineProgress(progress), label),
         },
       )
         .then((response) => {
-          if (response.type !== 'ready') throw new Error('本地图像引擎初始化失败')
+          if (response.type !== 'ready') throw new Error(messages.engineInitFailed)
           this.engineReady = true
-          this.reportWarmProgress(100, '图像引擎已就绪')
+          this.reportWarmProgress(100, messages.engineReady)
         })
         .catch((error: unknown) => {
           this.engineReady = false
@@ -447,11 +448,12 @@ export class ScannerClient {
     requestOptions: ScannerDetectionRequestOptions = {},
   ) {
     const requiresInitialization = !this.engineReady
-    if (requiresInitialization) requestOptions.onProgress?.(0, ENGINE_DOWNLOAD_LABEL)
+    if (requiresInitialization) requestOptions.onProgress?.(0, messages.engineDownload)
     const response = await this.request(
       {
         id: createId(),
         type: 'detect',
+        locale,
         source,
         mode,
         passportLayout,
@@ -459,12 +461,12 @@ export class ScannerClient {
       {
         intent: 'detect',
         timeoutMs: requiresInitialization ? ENGINE_INITIALIZATION_TIMEOUT_MS : undefined,
-        timeoutMessage: DETECTION_TIMEOUT_MESSAGE,
+        timeoutMessage: 'detectionTimeout',
         signal: requestOptions.signal,
         onProgress: requestOptions.onProgress,
       },
     )
-    if (response.type !== 'detected') throw new Error('未收到边缘识别结果')
+    if (response.type !== 'detected') throw new Error(messages.missingDetection)
     this.engineReady = true
     return response.result
   }
@@ -488,6 +490,7 @@ export class ScannerClient {
       {
         id: createId(),
         type: 'render',
+        locale,
         page,
         options,
         cacheIntermediate: intent === 'preview',
@@ -495,11 +498,11 @@ export class ScannerClient {
       {
         intent,
         timeoutMs: requiresInitialization ? ENGINE_INITIALIZATION_TIMEOUT_MS : undefined,
-        timeoutMessage: intent === 'export' ? EXPORT_TIMEOUT_MESSAGE : PREVIEW_TIMEOUT_MESSAGE,
+        timeoutMessage: intent === 'export' ? 'exportTimeout' : 'previewTimeout',
         signal: requestOptions.signal,
       },
     ).then((response) => {
-      if (response.type !== 'rendered') throw new Error('未收到图像处理结果')
+      if (response.type !== 'rendered') throw new Error(messages.missingRender)
       this.engineReady = true
       return {
         blob: response.blob,

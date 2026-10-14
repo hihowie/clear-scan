@@ -14,13 +14,16 @@ import { Progress } from '@/components/ui/progress'
 import type { ExportFormat, PdfLayout } from '@/lib/exporters'
 import type { ScanPage, ScanProject } from '@/lib/types'
 import { downloadBlob, cn } from '@/lib/utils'
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 export function ExportDialog({ project, pages }: { project: ScanProject; pages: ScanPage[] }) {
+  useLocale()
   const [open, setOpen] = useState(false)
   const [format, setFormat] = useState<ExportFormat>('pdf')
   const [layout, setLayout] = useState<PdfLayout>(project.mode === 'id-card' ? 'a4' : 'content')
   const [progress, setProgress] = useState(0)
-  const [label, setLabel] = useState('准备导出')
+  const [label, setLabel] = useState(messages.preparingExport)
   const [exporting, setExporting] = useState(false)
   const idComplete =
     project.mode !== 'id-card' ||
@@ -35,28 +38,35 @@ export function ExportDialog({ project, pages }: { project: ScanProject; pages: 
   }> = [
     {
       value: 'pdf',
-      label: 'PDF 文档',
-      description: project.mode === 'id-card' ? 'A4 单页 · 大图排版' : `${pages.length} 页`,
+      label: messages.pdfDocument,
+      description:
+        project.mode === 'id-card' ? messages.a4Combined : messages.pageCount(pages.length),
       icon: FileText,
     },
     {
       value: 'jpg',
-      label: 'JPG 图片',
-      description: pages.length > 1 && project.mode !== 'id-card' ? '仅限单页' : '兼容性最好',
+      label: messages.jpgImage,
+      description:
+        pages.length > 1 && project.mode !== 'id-card'
+          ? messages.singlePageOnly
+          : messages.bestCompatibility,
       icon: FileImage,
       hidden: pages.length > 1 && project.mode !== 'id-card',
     },
     {
       value: 'png',
-      label: 'PNG 图片',
-      description: pages.length > 1 && project.mode !== 'id-card' ? '仅限单页' : '无损格式',
+      label: messages.pngImage,
+      description:
+        pages.length > 1 && project.mode !== 'id-card'
+          ? messages.singlePageOnly
+          : messages.lossless,
       icon: FileImage,
       hidden: pages.length > 1 && project.mode !== 'id-card',
     },
     {
       value: 'zip',
-      label: '图片包 ZIP',
-      description: `${pages.length} 张 JPG`,
+      label: messages.zipImages,
+      description: messages.jpgCount(pages.length),
       icon: FileArchive,
       hidden: project.mode === 'id-card',
     },
@@ -75,6 +85,7 @@ export function ExportDialog({ project, pages }: { project: ScanProject; pages: 
 
   const runExport = async () => {
     setExporting(true)
+    setLabel(messages.preparingExport)
     setProgress(1)
     try {
       const { exportProject } = await import('@/lib/exporters')
@@ -83,11 +94,11 @@ export function ExportDialog({ project, pages }: { project: ScanProject; pages: 
         setLabel(nextLabel)
       })
       downloadBlob(result.blob, result.fileName)
-      toast.success('导出完成', { description: result.fileName })
+      toast.success(messages.exportComplete, { description: result.fileName })
       setOpen(false)
     } catch (reason) {
-      toast.error('导出失败', {
-        description: reason instanceof Error ? reason.message : '请稍后重试',
+      toast.error(messages.exportFailed, {
+        description: reason instanceof Error ? reason.message : messages.retryLater,
       })
     } finally {
       setExporting(false)
@@ -100,18 +111,16 @@ export function ExportDialog({ project, pages }: { project: ScanProject; pages: 
       <DialogTrigger asChild>
         <Button
           disabled={!pages.length || !idComplete || !allCropsConfirmed}
-          title={!allCropsConfirmed ? '请先确认所有页面的裁剪边缘' : undefined}
+          title={!allCropsConfirmed ? messages.confirmCropsFirst : undefined}
         >
           <Download />
-          导出
+          {messages.export}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>导出扫描结果</DialogTitle>
-          <DialogDescription>
-            文件在本机生成，导出图片不会携带原照片的 EXIF 或定位信息。
-          </DialogDescription>
+          <DialogTitle>{messages.exportTitle}</DialogTitle>
+          <DialogDescription>{messages.exportPrivacy}</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-2">
           {formats
@@ -144,7 +153,7 @@ export function ExportDialog({ project, pages }: { project: ScanProject; pages: 
         </div>
         {format === 'pdf' && project.mode !== 'id-card' && (
           <div>
-            <p className="mb-2 text-xs font-bold">PDF 页面尺寸</p>
+            <p className="mb-2 text-xs font-bold">{messages.pdfPageSize}</p>
             <div className="grid grid-cols-2 rounded-xl bg-muted p-1">
               <button
                 type="button"
@@ -155,7 +164,7 @@ export function ExportDialog({ project, pages }: { project: ScanProject; pages: 
                   layout === 'content' && 'bg-background shadow-sm',
                 )}
               >
-                适应内容
+                {messages.fitContent}
               </button>
               <button
                 type="button"
@@ -166,7 +175,7 @@ export function ExportDialog({ project, pages }: { project: ScanProject; pages: 
                   layout === 'a4' && 'bg-background shadow-sm',
                 )}
               >
-                统一 A4
+                {messages.uniformA4}
               </button>
             </div>
           </div>
@@ -185,7 +194,7 @@ export function ExportDialog({ project, pages }: { project: ScanProject; pages: 
         )}
         <Button size="lg" disabled={exporting} onClick={() => void runExport()}>
           {exporting ? <LoaderCircle className="animate-spin" /> : <Download />}
-          {exporting ? '正在生成…' : '生成并下载'}
+          {exporting ? messages.generating : messages.generateDownload}
         </Button>
       </DialogContent>
     </Dialog>

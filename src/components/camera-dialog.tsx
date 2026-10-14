@@ -3,6 +3,8 @@ import { Camera, CameraOff, LoaderCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 interface ImageCaptureInstance {
   takePhoto: () => Promise<Blob>
@@ -21,6 +23,7 @@ export function CameraDialog({
   onOpenChange: (open: boolean) => void
   onCapture: (file: File) => void
 }) {
+  useLocale()
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | undefined>(undefined)
   const [loading, setLoading] = useState(false)
@@ -35,11 +38,7 @@ export function CameraDialog({
     setError(undefined)
     if (!navigator.mediaDevices?.getUserMedia) {
       setLoading(false)
-      setError(
-        window.isSecureContext
-          ? '当前浏览器没有提供网页摄像头接口'
-          : '网页摄像头需要 HTTPS 或 localhost 环境',
-      )
+      setError(window.isSecureContext ? messages.cameraUnavailable : messages.cameraNeedsHttps)
       return
     }
     void navigator.mediaDevices
@@ -72,7 +71,7 @@ export function CameraDialog({
       .catch((reason: unknown) => {
         if (cancelled) return
         setLoading(false)
-        setError(reason instanceof Error ? reason.message : '无法访问摄像头')
+        setError(reason instanceof Error ? reason.message : messages.cameraAccessFailed)
       })
 
     return () => {
@@ -99,11 +98,11 @@ export function CameraDialog({
         canvas.width = settings.width ?? video.videoWidth
         canvas.height = settings.height ?? video.videoHeight
         const context = canvas.getContext('2d')
-        if (!context) throw new Error('无法截取摄像头画面')
+        if (!context) throw new Error(messages.cameraFrameFailed)
         context.drawImage(video, 0, 0, canvas.width, canvas.height)
         blob = await new Promise<Blob>((resolve, reject) =>
           canvas.toBlob(
-            (value) => (value ? resolve(value) : reject(new Error('拍摄失败'))),
+            (value) => (value ? resolve(value) : reject(new Error(messages.captureFailed))),
             'image/jpeg',
             0.95,
           ),
@@ -112,7 +111,7 @@ export function CameraDialog({
       onCapture(new File([blob], `camera-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' }))
       onOpenChange(false)
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : '拍摄失败')
+      toast.error(reason instanceof Error ? reason.message : messages.captureFailed)
     } finally {
       setCapturing(false)
     }
@@ -122,7 +121,7 @@ export function CameraDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl bg-[#0c1813] p-3 text-white">
         <DialogHeader className="px-3 pt-2">
-          <DialogTitle className="text-white">摄像头拍摄</DialogTitle>
+          <DialogTitle className="text-white">{messages.cameraTitle}</DialogTitle>
         </DialogHeader>
         <div className="paper-grid relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
           <video ref={videoRef} playsInline muted className="size-full object-cover" />
@@ -135,7 +134,7 @@ export function CameraDialog({
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 px-6 text-center">
               <CameraOff className="size-8 text-red-300" />
               <p className="text-sm">{error}</p>
-              <p className="text-xs text-white/60">请允许摄像头权限，或改用上传照片。</p>
+              <p className="text-xs text-white/60">{messages.cameraPermissionHint}</p>
             </div>
           )}
           {!error && !loading && (
@@ -159,7 +158,7 @@ export function CameraDialog({
             ) : (
               <Camera className="size-6" />
             )}
-            <span className="sr-only">{capturing ? '正在拍照' : '拍照'}</span>
+            <span className="sr-only">{capturing ? messages.capturing : messages.takePhoto}</span>
           </Button>
         </div>
       </DialogContent>

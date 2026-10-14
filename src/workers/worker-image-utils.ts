@@ -1,4 +1,5 @@
 import { clamp } from '@/lib/geometry'
+import { messages } from '@/lib/i18n'
 
 export async function blobToImageData(blob: Blob, maxEdge: number) {
   const bitmap = await createImageBitmap(blob, {
@@ -9,7 +10,7 @@ export async function blobToImageData(blob: Blob, maxEdge: number) {
   const height = Math.max(1, Math.round(bitmap.height * scale))
   const canvas = new OffscreenCanvas(width, height)
   const context = canvas.getContext('2d', { willReadFrequently: true })
-  if (!context) throw new Error('当前浏览器无法创建图像画布')
+  if (!context) throw new Error(messages.canvasUnavailable)
   context.drawImage(bitmap, 0, 0, width, height)
   bitmap.close()
   return {

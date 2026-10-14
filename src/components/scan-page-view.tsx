@@ -19,16 +19,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { MODE_LABELS, type ScanMode, type ScanPage, type ScanProject } from '@/lib/types'
+import type { ScanMode, ScanPage, ScanProject } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 export type ScanStage = 'capture' | 'crop' | 'enhance'
-
-const scanSteps = [
-  { key: 'capture', label: '拍照或上传', icon: ScanLine },
-  { key: 'crop', label: '确认边缘', icon: Crop },
-  { key: 'enhance', label: '增强与导出', icon: Sparkles },
-] as const
 
 export function ScanPageHeader({
   mode,
@@ -43,21 +39,29 @@ export function ScanPageHeader({
   onBack: () => void
   onRename: (name: string) => void
 }) {
+  useLocale()
+  const modeLabels: Record<ScanMode, string> = {
+    'id-card': messages.idCardScan,
+    passport: messages.passportScan,
+    document: messages.documentScan,
+  }
   return (
     <div className="border-b border-border/80 bg-card lg:shrink-0">
       <div className="mx-auto grid max-w-[1480px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[auto_auto_minmax(0,1fr)_auto] sm:px-6">
-        <Button variant="ghost" size="icon" onClick={onBack} aria-label="返回首页">
+        <Button variant="ghost" size="icon" onClick={onBack} aria-label={messages.backHome}>
           <ArrowLeft />
         </Button>
         <div className="flex items-center gap-2 whitespace-nowrap">
-          <Badge variant="secondary">{MODE_LABELS[mode]}</Badge>
-          <span className="text-[10px] font-semibold text-muted-foreground">{pages.length} 页</span>
+          <Badge variant="secondary">{modeLabels[mode]}</Badge>
+          <span className="text-[10px] font-semibold text-muted-foreground">
+            {messages.pageCount(pages.length)}
+          </span>
         </div>
         {project ? (
           <div className="group col-span-3 row-start-2 w-fit min-w-0 max-w-full sm:col-span-1 sm:col-start-3 sm:row-start-1">
             <label
               className="flex max-w-sm cursor-text items-center gap-2 border-b border-transparent py-1 transition hover:border-border focus-within:border-primary"
-              title="点击修改名称, 修改自动保存"
+              title={messages.renameHint}
             >
               <Pencil
                 aria-hidden="true"
@@ -68,21 +72,21 @@ export function ScanPageHeader({
                   aria-hidden="true"
                   className="invisible block overflow-hidden pr-4 whitespace-pre"
                 >
-                  {project.name || '未命名文档'}
+                  {project.name || messages.untitled}
                 </span>
                 <input
                   value={project.name}
                   onChange={(event) => onRename(event.target.value)}
                   className="absolute inset-0 size-full min-w-0 truncate bg-transparent pr-4 outline-none"
-                  aria-label="项目名称"
-                  placeholder="未命名文档"
+                  aria-label={messages.projectName}
+                  placeholder={messages.untitled}
                 />
               </span>
             </label>
           </div>
         ) : (
           <h1 className="col-span-3 row-start-2 text-sm font-bold sm:col-span-1 sm:col-start-3 sm:row-start-1">
-            新建{MODE_LABELS[mode]}
+            {messages.newScan(modeLabels[mode])}
           </h1>
         )}
         <div className="col-start-3 row-start-1 justify-self-end sm:col-start-4">
@@ -94,6 +98,12 @@ export function ScanPageHeader({
 }
 
 export function ScanStageNavigation({ stage }: { stage: ScanStage }) {
+  useLocale()
+  const scanSteps = [
+    { key: 'capture', label: messages.captureStep, icon: ScanLine },
+    { key: 'crop', label: messages.cropStep, icon: Crop },
+    { key: 'enhance', label: messages.enhanceStep, icon: Sparkles },
+  ] as const
   return (
     <div className="border-b border-border/80 bg-background lg:shrink-0">
       <div className="mx-auto max-w-[1480px] px-4 py-2.5 sm:px-6">
@@ -172,25 +182,24 @@ export function ScanDeleteDialog({
   onClose: () => void
   onConfirm: () => void
 }) {
+  useLocale()
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && !deleting && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trash2 className="text-destructive" />
-            <span>{`删除${pageLabel}？`}</span>
+            <span>{messages.deletePageTitle(pageLabel)}</span>
           </DialogTitle>
-          <DialogDescription>
-            该页原图、裁剪设置和增强效果都会永久移除，其他页面不会受到影响。
-          </DialogDescription>
+          <DialogDescription>{messages.deletePageDescription}</DialogDescription>
         </DialogHeader>
         <div className="flex justify-end gap-2">
           <Button variant="outline" disabled={deleting} onClick={onClose}>
-            取消
+            {messages.cancel}
           </Button>
           <Button variant="destructive" disabled={deleting} onClick={onConfirm}>
             {deleting ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
-            确认删除
+            {messages.confirmDelete}
           </Button>
         </div>
       </DialogContent>

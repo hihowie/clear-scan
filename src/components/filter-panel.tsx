@@ -21,6 +21,8 @@ import {
   type GlareLevel,
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 type EffectCategory = keyof EnhancementEffects
 type QuickPreset = 'original' | 'smart'
@@ -36,44 +38,6 @@ interface EffectGroup {
   label: string
   options: EffectOption[]
 }
-
-const effectGroups: EffectGroup[] = [
-  {
-    key: 'shadow',
-    label: '光照修复',
-    options: [
-      { value: 'none', label: '关闭' },
-      { value: 'deshadow', label: '标准去阴影' },
-      { value: 'balance', label: '亮度均衡' },
-    ],
-  },
-  {
-    key: 'glare',
-    label: '反光修复',
-    options: [
-      { value: 'none', label: '关闭' },
-      { value: 'deglare', label: '去反光' },
-    ],
-  },
-  {
-    key: 'color',
-    label: '色彩风格',
-    options: [
-      { value: 'original', label: '原色' },
-      { value: 'enhanced-color', label: '彩色增强' },
-      { value: 'grayscale', label: '灰度' },
-      { value: 'black-white', label: '黑白' },
-    ],
-  },
-  {
-    key: 'detail',
-    label: '细节增强',
-    options: [
-      { value: 'none', label: '自然' },
-      { value: 'sharpen', label: '加锐' },
-    ],
-  },
-]
 
 function effectsEqual(left: EnhancementEffects, right: EnhancementEffects) {
   return (
@@ -147,6 +111,44 @@ export function FilterPanel({
   onAdjustmentsChange: (settings: EnhancementSettings) => void
   onRotate: (direction: RotationDirection) => void
 }) {
+  useLocale()
+  const effectGroups: EffectGroup[] = [
+    {
+      key: 'shadow',
+      label: messages.lighting,
+      options: [
+        { value: 'none', label: messages.off },
+        { value: 'deshadow', label: messages.deshadow },
+        { value: 'balance', label: messages.balance },
+      ],
+    },
+    {
+      key: 'glare',
+      label: messages.glare,
+      options: [
+        { value: 'none', label: messages.off },
+        { value: 'deglare', label: messages.deglare },
+      ],
+    },
+    {
+      key: 'color',
+      label: messages.colorStyle,
+      options: [
+        { value: 'original', label: messages.originalColor },
+        { value: 'enhanced-color', label: messages.enhancedColor },
+        { value: 'grayscale', label: messages.grayscale },
+        { value: 'black-white', label: messages.blackWhite },
+      ],
+    },
+    {
+      key: 'detail',
+      label: messages.detail,
+      options: [
+        { value: 'none', label: messages.natural },
+        { value: 'sharpen', label: messages.sharpen },
+      ],
+    },
+  ]
   const defaultAdjustments = adjustmentsEqual(adjustments, DEFAULT_ADJUSTMENTS)
   const glareRepairEnabled = effects.glare === 'deglare'
   const activePreset =
@@ -161,23 +163,24 @@ export function FilterPanel({
     min: number
     max: number
   }> = [
-    { key: 'brightness', label: '亮度', min: -40, max: 40 },
-    { key: 'contrast', label: '对比度', min: -30, max: 40 },
+    { key: 'brightness', label: messages.brightness, min: -40, max: 40 },
+    { key: 'contrast', label: messages.contrast, min: -30, max: 40 },
     ...(effects.color === 'enhanced-color'
-      ? [{ key: 'whiteningStrength' as const, label: '增白强度', min: 0, max: 100 }]
+      ? [{ key: 'whiteningStrength' as const, label: messages.whitening, min: 0, max: 100 }]
       : []),
     ...(effects.shadow !== 'none'
       ? [
           {
             key: 'shadowStrength' as const,
-            label: effects.shadow === 'balance' ? '均衡强度' : '阴影强度',
+            label:
+              effects.shadow === 'balance' ? messages.balanceStrength : messages.shadowStrength,
             min: 0,
             max: 100,
           },
         ]
       : []),
     ...(effects.detail === 'sharpen'
-      ? [{ key: 'sharpness' as const, label: '锐化强度', min: 0, max: 100 }]
+      ? [{ key: 'sharpness' as const, label: messages.sharpness, min: 0, max: 100 }]
       : []),
   ]
 
@@ -198,11 +201,11 @@ export function FilterPanel({
             <span>
               {glareLevel === 'severe'
                 ? glareRepairEnabled
-                  ? '已启用去反光，正在压制可识别的高光；纯白区域的文字无法恢复时请换个角度重拍。'
-                  : '检测到明显过曝区域。建议启用去反光；纯白区域的文字无法恢复时请换个角度重拍。'
+                  ? messages.glareSevereEnabled
+                  : messages.glareSevereDisabled
                 : glareRepairEnabled
-                  ? '已启用去反光，可与光照修复同时使用。'
-                  : '检测到轻微反光，可以与光照修复同时启用。'}
+                  ? messages.glareMildEnabled
+                  : messages.glareMildDisabled}
             </span>
           </div>
         </div>
@@ -212,19 +215,21 @@ export function FilterPanel({
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="flex items-center gap-2 text-sm font-bold">
             <Sparkles className="size-4 text-primary" />
-            快捷方案
+            {messages.presets}
           </h3>
-          <Badge variant="secondary">{activePreset === 'custom' ? '自定义组合' : '推荐方案'}</Badge>
+          <Badge variant="secondary">
+            {activePreset === 'custom' ? messages.customEffects : messages.recommendedPreset}
+          </Badge>
         </div>
         <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-muted p-1.5">
           {[
             {
               value: 'original' as const,
-              label: '原版',
+              label: messages.originalPreset,
             },
             {
               value: 'smart' as const,
-              label: '智能增强',
+              label: messages.smartPreset,
             },
           ].map((preset) => (
             <button
@@ -249,8 +254,10 @@ export function FilterPanel({
 
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="text-sm font-bold">效果组合</h3>
-          <span className="text-[10px] font-semibold text-muted-foreground">跨分类可叠加</span>
+          <h3 className="text-sm font-bold">{messages.effectCombination}</h3>
+          <span className="text-[10px] font-semibold text-muted-foreground">
+            {messages.stackCategories}
+          </span>
         </div>
         <div className="space-y-3">
           {effectGroups.map((group) => (
@@ -291,7 +298,7 @@ export function FilterPanel({
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold [&::-webkit-details-marker]:hidden">
           <span className="flex items-center gap-2">
             <SlidersHorizontal className="size-4 text-primary" />
-            高级微调
+            {messages.advancedAdjustments}
           </span>
           <ChevronDown className="size-4 text-muted-foreground transition group-open:rotate-180" />
         </summary>
@@ -303,7 +310,7 @@ export function FilterPanel({
             onClick={() => onAdjustmentsChange({ ...DEFAULT_ADJUSTMENTS })}
           >
             <RotateCcw className="size-3.5" />
-            恢复默认
+            {messages.restoreDefaults}
           </Button>
         )}
         <div className="border-t border-border/70 px-4 pb-4 pt-4">
@@ -329,16 +336,20 @@ export function FilterPanel({
 
       <div className="grid grid-cols-2 gap-2">
         <Button
-          aria-label="逆时针旋转 90°"
+          aria-label={messages.rotateCounterclockwise}
           variant="outline"
           onClick={() => onRotate('counterclockwise')}
         >
           <RotateCcw />
-          逆时针 90°
+          {messages.counterclockwise}
         </Button>
-        <Button aria-label="顺时针旋转 90°" variant="outline" onClick={() => onRotate('clockwise')}>
+        <Button
+          aria-label={messages.rotateClockwise}
+          variant="outline"
+          onClick={() => onRotate('clockwise')}
+        >
           <RotateCw />
-          顺时针 90°
+          {messages.clockwise}
         </Button>
       </div>
     </div>

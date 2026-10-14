@@ -19,42 +19,44 @@ import { ProjectCard } from '@/components/project-card'
 import { useScannerNavigation } from '@/hooks/use-scanner-navigation'
 import { useProjectSummaries } from '@/hooks/use-projects'
 import type { ScanMode } from '@/lib/types'
-
-const modes: Array<{
-  mode: ScanMode
-  title: string
-  description: string
-  detail: string
-  icon: typeof CreditCard
-  tone: string
-}> = [
-  {
-    mode: 'id-card',
-    title: '身份证扫描',
-    description: '正反两面，自动合成一张 A4',
-    detail: '保持标准卡片比例，适合存档与打印',
-    icon: CreditCard,
-    tone: 'from-emerald-50 to-teal-100/70 text-emerald-800',
-  },
-  {
-    mode: 'passport',
-    title: '护照扫描',
-    description: '资料页与展开双页均可识别',
-    detail: '针对机读区与彩色证件优化增强',
-    icon: Plane,
-    tone: 'from-amber-50 to-orange-100/70 text-amber-800',
-  },
-  {
-    mode: 'document',
-    title: '文档扫描',
-    description: '连续扫描、排序并导出 PDF',
-    detail: '合同、票据、笔记都能快速归档',
-    icon: FileText,
-    tone: 'from-sky-50 to-cyan-100/70 text-sky-800',
-  },
-]
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 export function HomePage() {
+  useLocale()
+  const modes: Array<{
+    mode: ScanMode
+    title: string
+    description: string
+    detail: string
+    icon: typeof CreditCard
+    tone: string
+  }> = [
+    {
+      mode: 'id-card',
+      title: messages.idCardScan,
+      description: messages.idCardDescription,
+      detail: messages.idCardDetail,
+      icon: CreditCard,
+      tone: 'from-emerald-50 to-teal-100/70 text-emerald-800',
+    },
+    {
+      mode: 'passport',
+      title: messages.passportScan,
+      description: messages.passportDescription,
+      detail: messages.passportDetail,
+      icon: Plane,
+      tone: 'from-amber-50 to-orange-100/70 text-amber-800',
+    },
+    {
+      mode: 'document',
+      title: messages.documentScan,
+      description: messages.documentDescription,
+      detail: messages.documentDetail,
+      icon: FileText,
+      tone: 'from-sky-50 to-cyan-100/70 text-sky-800',
+    },
+  ]
   const openScanner = useScannerNavigation()
   const { summaries, loading } = useProjectSummaries(4)
 
@@ -63,37 +65,36 @@ export function HomePage() {
       <section className="relative overflow-hidden rounded-[2rem] border border-primary/10 bg-[#edf7f1] px-6 py-10 sm:px-10 lg:grid lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:px-14 lg:py-14">
         <div className="relative z-10 max-w-2xl">
           <Badge className="mb-5 bg-white/75">
-            <ShieldCheck className="size-3.5" /> 隐私优先 · 图片不离开设备
+            <ShieldCheck className="size-3.5" /> {messages.privacyBadge}
           </Badge>
           <h1 className="text-balance text-4xl font-bold leading-[1.12] tracking-[-0.04em] sm:text-5xl lg:text-[3.4rem]">
-            把口袋里的相机，
-            <br className="hidden sm:block" />
-            变成一台<span className="text-primary">清晰扫描仪</span>
+            {messages.heroLead} <br className="hidden sm:block" />
+            {messages.heroSecond} <span className="text-primary">{messages.heroHighlight}</span>
           </h1>
           <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-            自动寻找文档边缘、校正透视、抑制反光。身份证、护照和多页文档，都在你的设备上完成处理。
+            {messages.heroDescription}
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Button size="lg" onClick={() => openScanner('/scan/document')}>
-              <ScanLine className="size-5" /> 开始扫描
+              <ScanLine className="size-5" /> {messages.startScan}
             </Button>
             <Button
               size="lg"
               variant="outline"
               onClick={() => document.getElementById('scan-modes')?.scrollIntoView()}
             >
-              选择证件类型 <ArrowRight />
+              {messages.chooseScanType} <ArrowRight />
             </Button>
           </div>
           <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <Check className="size-3.5 text-primary" /> 无需注册
+              <Check className="size-3.5 text-primary" /> {messages.noSignup}
             </span>
             <span className="flex items-center gap-1.5">
-              <Check className="size-3.5 text-primary" /> 可离线使用
+              <Check className="size-3.5 text-primary" /> {messages.worksOffline}
             </span>
             <span className="flex items-center gap-1.5">
-              <Check className="size-3.5 text-primary" /> 无水印导出
+              <Check className="size-3.5 text-primary" /> {messages.noWatermark}
             </span>
           </div>
         </div>
@@ -103,7 +104,8 @@ export function HomePage() {
           <div className="relative rotate-[1.5deg] rounded-[2rem] border border-white/80 bg-white/85 p-4 shadow-[0_30px_80px_rgba(24,70,50,.16)] backdrop-blur">
             <div className="paper-grid relative aspect-[4/3] overflow-hidden rounded-[1.4rem] p-7">
               <div className="absolute left-5 top-5 flex items-center gap-2 rounded-full bg-black/30 px-3 py-1.5 text-[10px] font-semibold text-white backdrop-blur">
-                <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> 边缘已识别
+                <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" />{' '}
+                {messages.edgesDetected}
               </div>
               <div className="mx-auto mt-7 flex h-[78%] w-[76%] rotate-[-2deg] flex-col rounded-sm bg-[#fffef8] p-6 shadow-2xl">
                 <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
@@ -130,15 +132,15 @@ export function HomePage() {
             <div className="grid grid-cols-3 gap-2 px-1 pb-1 pt-4 text-center text-[10px] font-semibold text-muted-foreground">
               <span>
                 <Sparkles className="mx-auto mb-1 size-4 text-primary" />
-                自动增强
+                {messages.autoEnhance}
               </span>
               <span>
                 <FileStack className="mx-auto mb-1 size-4 text-primary" />
-                多页 PDF
+                {messages.multiPagePdf}
               </span>
               <span>
                 <LockKeyhole className="mx-auto mb-1 size-4 text-primary" />
-                本地处理
+                {messages.localProcessing}
               </span>
             </div>
           </div>
@@ -149,11 +151,11 @@ export function HomePage() {
         <div className="mb-7 flex items-end justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[.18em] text-primary">Scan modes</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">今天要扫描什么？</h2>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+              {messages.whatToScan}
+            </h2>
           </div>
-          <p className="hidden text-sm text-muted-foreground sm:block">
-            拍照或上传，后续步骤都可手动调整
-          </p>
+          <p className="hidden text-sm text-muted-foreground sm:block">{messages.scanTypesHint}</p>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           {modes.map((mode) => (
@@ -192,12 +194,12 @@ export function HomePage() {
             <p className="text-xs font-bold uppercase tracking-[.18em] text-primary">
               Recent scans
             </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight">最近扫描</h2>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight">{messages.recentScans}</h2>
           </div>
           {summaries.length > 0 && (
             <Button asChild variant="ghost">
               <Link to="/history">
-                查看全部 <ArrowRight />
+                {messages.viewAll} <ArrowRight />
               </Link>
             </Button>
           )}
@@ -219,10 +221,8 @@ export function HomePage() {
             <div className="grid size-12 place-items-center rounded-2xl bg-secondary text-primary">
               <FileStack />
             </div>
-            <h3 className="mt-4 font-semibold">还没有扫描记录</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              完成第一次扫描后，会自动保存在这里。
-            </p>
+            <h3 className="mt-4 font-semibold">{messages.noHistory}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{messages.recentEmpty}</p>
           </Card>
         )}
       </section>
@@ -231,27 +231,27 @@ export function HomePage() {
         <div className="flex gap-3">
           <LockKeyhole className="mt-0.5 size-5 shrink-0 text-primary" />
           <div>
-            <h3 className="text-sm font-bold">不上传图片</h3>
+            <h3 className="text-sm font-bold">{messages.noUpload}</h3>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              识别、增强和导出都在浏览器内完成。
+              {messages.noUploadDescription}
             </p>
           </div>
         </div>
         <div className="flex gap-3">
           <WifiOff className="mt-0.5 size-5 shrink-0 text-primary" />
           <div>
-            <h3 className="text-sm font-bold">准备后可离线</h3>
+            <h3 className="text-sm font-bold">{messages.offlineAfterSetup}</h3>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              首次缓存图像引擎后，无网络也能继续工作。
+              {messages.offlineAfterSetupDescription}
             </p>
           </div>
         </div>
         <div className="flex gap-3">
           <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
           <div>
-            <h3 className="text-sm font-bold">随时清空记录</h3>
+            <h3 className="text-sm font-bold">{messages.clearAnytime}</h3>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              扫描原图只存于当前浏览器的 IndexedDB。
+              {messages.clearAnytimeDescription}
             </p>
           </div>
         </div>

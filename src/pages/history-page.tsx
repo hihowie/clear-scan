@@ -25,15 +25,17 @@ import { useProjectSummaries } from '@/hooks/use-projects'
 import { clearScannerData, deleteProject } from '@/lib/db'
 import type { ScanMode } from '@/lib/types'
 import { cn } from '@/lib/utils'
-
-const filters: Array<{ value: 'all' | ScanMode; label: string; icon?: typeof CreditCard }> = [
-  { value: 'all', label: '全部' },
-  { value: 'id-card', label: '身份证', icon: CreditCard },
-  { value: 'passport', label: '护照', icon: Plane },
-  { value: 'document', label: '文档', icon: FileText },
-]
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 export function HistoryPage() {
+  useLocale()
+  const filters: Array<{ value: 'all' | ScanMode; label: string; icon?: typeof CreditCard }> = [
+    { value: 'all', label: messages.all },
+    { value: 'id-card', label: messages.idCard, icon: CreditCard },
+    { value: 'passport', label: messages.passport, icon: Plane },
+    { value: 'document', label: messages.document, icon: FileText },
+  ]
   const { summaries, loading, reload } = useProjectSummaries()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | ScanMode>('all')
@@ -59,17 +61,17 @@ export function HistoryPage() {
     try {
       await deleteProject(projectId)
       setDeleteId(undefined)
-      toast.success('扫描项目已删除')
+      toast.success(messages.projectDeleted)
       try {
         await reload()
       } catch (reason) {
-        toast.error('扫描记录刷新失败', {
-          description: reason instanceof Error ? reason.message : '请刷新页面后重试',
+        toast.error(messages.historyRefreshFailed, {
+          description: reason instanceof Error ? reason.message : messages.refreshRetry,
         })
       }
     } catch (reason) {
-      toast.error('扫描项目删除失败', {
-        description: reason instanceof Error ? reason.message : '请稍后重试',
+      toast.error(messages.projectDeleteFailed, {
+        description: reason instanceof Error ? reason.message : messages.retryLater,
       })
     } finally {
       setDeleting(false)
@@ -82,10 +84,10 @@ export function HistoryPage() {
       await clearScannerData()
       await reload()
       setClearOpen(false)
-      toast.success('所有扫描历史已清空')
+      toast.success(messages.historyCleared)
     } catch (reason) {
-      toast.error('扫描历史清理失败', {
-        description: reason instanceof Error ? reason.message : '请关闭其他页面后重试',
+      toast.error(messages.historyClearFailed, {
+        description: reason instanceof Error ? reason.message : messages.closeOtherPages,
       })
     } finally {
       setClearing(false)
@@ -97,15 +99,13 @@ export function HistoryPage() {
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
           <p className="text-xs font-bold uppercase tracking-[.18em] text-primary">Local library</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">扫描记录</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            所有项目只保存在此设备的当前浏览器中。
-          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{messages.history}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{messages.historyLocalNotice}</p>
         </div>
         {summaries.length > 0 && (
           <Button variant="destructive" disabled={clearing} onClick={() => setClearOpen(true)}>
             <Trash2 />
-            清空所有历史数据
+            {messages.clearHistory}
           </Button>
         )}
       </div>
@@ -117,12 +117,15 @@ export function HistoryPage() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              aria-label="搜索扫描项目"
-              placeholder="搜索项目名称"
+              aria-label={messages.searchProjects}
+              placeholder={messages.searchPlaceholder}
               className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
             />
           </label>
-          <div className="hide-scrollbar flex gap-1 overflow-x-auto" aria-label="扫描类型筛选">
+          <div
+            className="hide-scrollbar flex gap-1 overflow-x-auto"
+            aria-label={messages.filterScanType}
+          >
             {filters.map((item) => (
               <button
                 key={item.value}
@@ -153,12 +156,10 @@ export function HistoryPage() {
           <span className="grid size-12 place-items-center rounded-2xl bg-secondary text-primary">
             <ScanLine />
           </span>
-          <h2 className="mt-4 font-semibold">还没有扫描记录</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            扫描第一份文档后，会自动保存在当前浏览器中。
-          </p>
+          <h2 className="mt-4 font-semibold">{messages.noHistory}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{messages.firstScanNotice}</p>
           <Button asChild className="mt-5">
-            <Link to="/scan/document">开始第一次扫描</Link>
+            <Link to="/scan/document">{messages.startFirstScan}</Link>
           </Button>
         </Card>
       ) : filtered.length ? (
@@ -174,8 +175,8 @@ export function HistoryPage() {
       ) : (
         <Card className="mt-6 flex min-h-72 flex-col items-center justify-center border-dashed text-center">
           <Search className="size-10 text-muted-foreground/35" />
-          <h2 className="mt-4 font-semibold">没有找到扫描项目</h2>
-          <p className="mt-1 text-sm text-muted-foreground">换个关键词或筛选条件试试。</p>
+          <h2 className="mt-4 font-semibold">{messages.noSearchResults}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{messages.searchAgain}</p>
         </Card>
       )}
 
@@ -185,18 +186,16 @@ export function HistoryPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>删除这个扫描项目？</DialogTitle>
-            <DialogDescription>
-              原图、裁剪设置和本地缩略图都会永久移除，此操作无法撤销。
-            </DialogDescription>
+            <DialogTitle>{messages.deleteProjectTitle}</DialogTitle>
+            <DialogDescription>{messages.deleteProjectDescription}</DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
             <Button variant="outline" disabled={deleting} onClick={() => setDeleteId(undefined)}>
-              取消
+              {messages.cancel}
             </Button>
             <Button variant="destructive" disabled={deleting} onClick={() => void confirmDelete()}>
               {deleting ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
-              {deleting ? '正在删除' : '删除'}
+              {deleting ? messages.deleting : messages.delete}
             </Button>
           </div>
         </DialogContent>
@@ -206,19 +205,17 @@ export function HistoryPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShieldAlert className="text-destructive" />
-              清空所有扫描历史？
+              {messages.clearHistoryTitle}
             </DialogTitle>
-            <DialogDescription>
-              所有项目、原图、缩略图、编辑设置和页面缓存都会永久删除，已经导出的文件不受影响。
-            </DialogDescription>
+            <DialogDescription>{messages.clearHistoryDescription}</DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
             <Button variant="outline" disabled={clearing} onClick={() => setClearOpen(false)}>
-              取消
+              {messages.cancel}
             </Button>
             <Button variant="destructive" disabled={clearing} onClick={() => void clearAll()}>
               {clearing && <LoaderCircle className="animate-spin" />}
-              确认清空
+              {messages.confirmClear}
             </Button>
           </div>
         </DialogContent>

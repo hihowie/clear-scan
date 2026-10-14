@@ -15,6 +15,7 @@ import { findDocumentQuad } from './document-detector'
 import { detectGlare } from './image-enhancer'
 import { clearRenderPipelineCache, renderPage } from './page-renderer'
 import { blobToImageData } from './worker-image-utils'
+import { messages, setLocale } from '@/lib/i18n'
 
 const workerScope = self as unknown as DedicatedWorkerGlobalScope & {
   cv?: CV | Promise<CV>
@@ -30,12 +31,12 @@ function ensureOpenCv(requestId: string) {
   if (!cvReadyPromise) {
     cvReadyPromise = (async () => {
       const candidate = workerScope.cv as CV | Promise<CV>
-      if (!candidate) throw new Error('OpenCV 本地图像引擎载入失败')
+      if (!candidate) throw new Error(messages.openCvLoadFailed)
       post({
         id: requestId,
         type: 'progress',
         progress: 10,
-        label: '正在初始化 OpenCV',
+        label: messages.initializingOpenCv,
       })
       if (candidate instanceof Promise) {
         cvRuntime = await candidate
@@ -52,7 +53,7 @@ function ensureOpenCv(requestId: string) {
           id: requestId,
           type: 'progress',
           progress: 14,
-          label: '正在编译图像算法',
+          label: messages.compilingAlgorithms,
         })
         await new Promise<void>((resolve) => {
           moduleThen.call(module, () => {
@@ -60,7 +61,7 @@ function ensureOpenCv(requestId: string) {
               id: requestId,
               type: 'progress',
               progress: 22,
-              label: 'OpenCV 已就绪',
+              label: messages.openCvReady,
             })
             resolve()
           })
@@ -87,16 +88,16 @@ async function detectDocument(
   mode: ScanMode,
   passportLayout?: PassportLayout,
 ) {
-  post({ id, type: 'progress', progress: 8, label: '正在读取照片' })
+  post({ id, type: 'progress', progress: 8, label: messages.readingPhoto })
   await ensureOpenCv(id)
   clearRenderPipelineCache()
   const cv = cvRuntime
-  if (!cv) throw new Error('OpenCV 尚未就绪')
-  post({ id, type: 'progress', progress: 35, label: '正在分析文档边缘' })
+  if (!cv) throw new Error(messages.openCvNotReady)
+  post({ id, type: 'progress', progress: 35, label: messages.analyzingEdges })
   const { imageData, sourceWidth, sourceHeight } = await blobToImageData(sourceBlob, 1600)
   const source = cv.matFromImageData(imageData)
   try {
-    post({ id, type: 'progress', progress: 54, label: '正在比较多种边缘候选' })
+    post({ id, type: 'progress', progress: 54, label: messages.comparingEdges })
     const detection = findDocumentQuad(
       cv,
       source,
@@ -122,7 +123,7 @@ async function detectDocument(
       cornerSource: accepted ? 'detected' : 'fallback',
       glareLevel: detectGlare(cv, source),
     }
-    post({ id, type: 'progress', progress: 100, label: '边缘识别完成' })
+    post({ id, type: 'progress', progress: 100, label: messages.edgeDetectionComplete })
     post({ id, type: 'detected', result })
   } finally {
     source.delete()
@@ -142,10 +143,10 @@ async function renderDocument(
   quality?: number,
   cacheIntermediate = false,
 ) {
-  post({ id, type: 'progress', progress: 10, label: '正在读取原图' })
+  post({ id, type: 'progress', progress: 10, label: messages.readingOriginal })
   await ensureOpenCv(id)
   const cv = cvRuntime
-  if (!cv) throw new Error('OpenCV 尚未就绪')
+  if (!cv) throw new Error(messages.openCvNotReady)
   const rendered = await renderPage(
     cv,
     page,
@@ -164,6 +165,7 @@ workerScope.addEventListener('message', (event: MessageEvent<ScannerWorkerReques
     clearRenderPipelineCache(request.pageId)
     return
   }
+  setLocale(request.locale)
   const task =
     request.type === 'init'
       ? initialize(request.id)
@@ -179,7 +181,7 @@ workerScope.addEventListener('message', (event: MessageEvent<ScannerWorkerReques
           )
 
   void task.catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : '本地图像处理失败'
+    const message = error instanceof Error ? error.message : messages.imageProcessingFailed
     post({ id: request.id, type: 'error', message })
   })
 })

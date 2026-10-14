@@ -4,14 +4,16 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { ProjectSummary } from '@/hooks/use-projects'
 import { formatDate } from '@/lib/utils'
-
-const modeMeta = {
-  'id-card': { label: '身份证', icon: CreditCard },
-  passport: { label: '护照', icon: Plane },
-  document: { label: '文档', icon: FileText },
-}
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 export function ProjectCard({ summary, onMenu }: { summary: ProjectSummary; onMenu?: () => void }) {
+  useLocale()
+  const modeMeta = {
+    'id-card': { label: messages.idCard, icon: CreditCard },
+    passport: { label: messages.passport, icon: Plane },
+    document: { label: messages.document, icon: FileText },
+  }
   const meta = modeMeta[summary.project.mode]
   return (
     <article className="group overflow-hidden rounded-2xl border border-border/80 bg-card transition hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_40px_rgba(20,50,38,.08)]">
@@ -33,7 +35,7 @@ export function ProjectCard({ summary, onMenu }: { summary: ProjectSummary; onMe
             <meta.icon className="size-3" /> {meta.label}
           </Badge>
           <span className="absolute bottom-3 right-3 rounded-full bg-black/55 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur">
-            {summary.pageCount} 页
+            {messages.pageCount(summary.pageCount)}
           </span>
         </div>
       </Link>
@@ -45,7 +47,7 @@ export function ProjectCard({ summary, onMenu }: { summary: ProjectSummary; onMe
           </p>
         </Link>
         {onMenu && (
-          <Button variant="ghost" size="icon" aria-label="项目操作" onClick={onMenu}>
+          <Button variant="ghost" size="icon" aria-label={messages.projectActions} onClick={onMenu}>
             <MoreHorizontal />
           </Button>
         )}

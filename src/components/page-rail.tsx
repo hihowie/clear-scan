@@ -3,6 +3,8 @@ import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, Trash2 } from 
 import { Button } from '@/components/ui/button'
 import type { ScanMode, ScanPage } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 function PageThumbnail({ source }: { source: Blob }) {
   const [url, setUrl] = useState<string>()
@@ -32,16 +34,21 @@ export function PageRail({
   onDelete: (page: ScanPage) => void
   onMove: (page: ScanPage, direction: -1 | 1) => void
 }) {
+  useLocale()
   const sorted = useMemo(() => [...pages].sort((a, b) => a.order - b.order), [pages])
 
   return (
     <div
-      aria-label="扫描页面"
+      aria-label={messages.scanPages}
       className="hide-scrollbar flex gap-2 overflow-x-auto p-3 lg:h-full lg:flex-col lg:overflow-y-auto lg:overflow-x-hidden lg:p-2"
     >
       {sorted.map((page, index) => {
         const label =
-          mode === 'id-card' ? (page.role === 'front' ? '人像面' : '国徽面') : `第 ${index + 1} 页`
+          mode === 'id-card'
+            ? page.role === 'front'
+              ? messages.frontSide
+              : messages.backSide
+            : messages.pageLabel(index + 1)
         const active = page.id === activeId
         return (
           <div
@@ -55,7 +62,7 @@ export function PageRail({
           >
             <button
               type="button"
-              aria-label={`打开${label}`}
+              aria-label={messages.openPage(label)}
               aria-pressed={active}
               onClick={() => onSelect(page)}
               className="block w-28 lg:w-full"
@@ -65,14 +72,16 @@ export function PageRail({
               </div>
               <span className="mt-1.5 block truncate px-1 text-[10px] font-semibold">
                 {label}
-                {!page.cropConfirmed && <span className="ml-1 text-amber-600">待确认</span>}
+                {!page.cropConfirmed && (
+                  <span className="ml-1 text-amber-600">{messages.pendingConfirmation}</span>
+                )}
               </span>
             </button>
             {active && (
               <div className="mt-1 grid grid-cols-3 overflow-hidden rounded-lg border border-border/80 bg-muted/60 text-muted-foreground">
                 <button
                   type="button"
-                  aria-label={`${label}前移`}
+                  aria-label={messages.movePageEarlier(label)}
                   disabled={index === 0}
                   onClick={() => onMove(page, -1)}
                   className="grid h-9 place-items-center border-r border-border/70 transition hover:bg-background hover:text-foreground disabled:opacity-30"
@@ -82,7 +91,7 @@ export function PageRail({
                 </button>
                 <button
                   type="button"
-                  aria-label={`${label}后移`}
+                  aria-label={messages.movePageLater(label)}
                   disabled={index === sorted.length - 1}
                   onClick={() => onMove(page, 1)}
                   className="grid h-9 place-items-center border-r border-border/70 transition hover:bg-background hover:text-foreground disabled:opacity-30"
@@ -92,7 +101,7 @@ export function PageRail({
                 </button>
                 <button
                   type="button"
-                  aria-label={`删除${label}`}
+                  aria-label={messages.deletePage(label)}
                   onClick={() => onDelete(page)}
                   className="grid h-9 w-full place-items-center transition hover:bg-red-50 hover:text-destructive"
                 >
@@ -110,7 +119,7 @@ export function PageRail({
           className="h-auto min-h-20 w-28 shrink-0 flex-col border-dashed text-xs lg:w-full"
         >
           <Plus />
-          添加页面
+          {messages.addPage}
         </Button>
       )}
     </div>

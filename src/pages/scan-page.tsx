@@ -27,12 +27,7 @@ import {
 } from '@/lib/db'
 import { DEFAULT_QUAD } from '@/lib/geometry'
 import { hasCachedEngineAsset } from '@/lib/engine-cache'
-import {
-  ENGINE_DOWNLOAD_LABEL,
-  ENGINE_TIMEOUT_MESSAGE,
-  isAbortError,
-  scannerClient,
-} from '@/lib/scanner-client'
+import { isEngineTimeout, isAbortError, scannerClient } from '@/lib/scanner-client'
 import {
   DEFAULT_ADJUSTMENTS,
   ORIGINAL_EFFECTS,
@@ -49,6 +44,8 @@ import {
   type ScanProject,
 } from '@/lib/types'
 import { createId, modeDefaultName } from '@/lib/utils'
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 function isScanMode(value?: string): value is ScanMode {
   return value === 'id-card' || value === 'passport' || value === 'document'
@@ -57,8 +54,8 @@ function isScanMode(value?: string): value is ScanMode {
 const MINIMUM_ENGINE_LOADING_DISPLAY_MS = 600
 
 interface EngineLoadError {
-  title: string
-  description: string
+  timedOut: boolean
+  reason?: string
 }
 
 function nextPageRole(mode: ScanMode, pages: ScanPageModel[]): PageRole {
@@ -91,6 +88,7 @@ async function fallbackDetection(source: Blob): Promise<DetectionResult> {
 }
 
 export function ScanPage() {
+  useLocale()
   const { mode: routeMode, projectId } = useParams()
   const navigate = useNavigate()
   const workspaceRef = useRef<HTMLElement | null>(null)
@@ -106,12 +104,12 @@ export function ScanPage() {
   const [busy, setBusy] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
   const [processingIndeterminate, setProcessingIndeterminate] = useState(false)
-  const [processingTitle, setProcessingTitle] = useState('正在处理照片')
-  const [processingLabel, setProcessingLabel] = useState('正在准备照片')
+  const [processingTitle, setProcessingTitle] = useState(messages.processingPhotos)
+  const [processingLabel, setProcessingLabel] = useState(messages.preparingPhoto)
   const [engineLoading, setEngineLoading] = useState(() => !scannerClient.isReady)
   const [showEngineLoading, setShowEngineLoading] = useState(false)
   const [engineLabel, setEngineLabel] = useState(
-    scannerClient.isReady ? '图像引擎已就绪' : ENGINE_DOWNLOAD_LABEL,
+    scannerClient.isReady ? messages.engineReady : messages.engineDownload,
   )
   const [engineLoadAttempt, setEngineLoadAttempt] = useState(0)
   const [engineLoadError, setEngineLoadError] = useState<EngineLoadError>()
@@ -153,10 +151,10 @@ export function ScanPage() {
   const pendingDeleteLabel = pendingDelete
     ? mode === 'id-card'
       ? pendingDelete.role === 'front'
-        ? '人像面'
-        : '国徽面'
-      : `第 ${pendingDelete.order + 1} 页`
-    : '这个页面'
+        ? messages.frontSide
+        : messages.backSide
+      : messages.pageLabel(pendingDelete.order + 1)
+    : messages.thisPage
 
   useEffect(() => {
     pagesRef.current = pages
@@ -165,7 +163,7 @@ export function ScanPage() {
   const markEngineReady = useCallback(() => {
     toast.dismiss('engine-loading-error')
     setEngineLoadError(undefined)
-    setEngineLabel('图像引擎已就绪')
+    setEngineLabel(messages.engineReady)
     setShowEngineLoading(false)
     setEngineLoading(false)
   }, [])
@@ -183,7 +181,7 @@ export function ScanPage() {
       setEngineLoadError(undefined)
       setEngineLoading(true)
       setShowEngineLoading(false)
-      setEngineLabel(ENGINE_DOWNLOAD_LABEL)
+      setEngineLabel(messages.engineDownload)
       const cachedAsset = hasCachedEngineAsset()
       void cachedAsset.then((cached) => {
         if (!cancelled && !finished) setShowEngineLoading(!cached)
@@ -210,14 +208,10 @@ export function ScanPage() {
           finished = true
           setShowEngineLoading(false)
           setEngineLoading(false)
-          const timedOut = reason instanceof Error && reason.message === ENGINE_TIMEOUT_MESSAGE
+          const timedOut = isEngineTimeout(reason)
           setEngineLoadError({
-            title: timedOut ? ENGINE_TIMEOUT_MESSAGE : '图像引擎加载失败',
-            description: timedOut
-              ? '请检查网络后重试'
-              : reason instanceof Error
-                ? `${reason.message}，请检查网络后重试`
-                : '请检查网络后重试',
+            timedOut,
+            reason: !timedOut && reason instanceof Error ? reason.message : undefined,
           })
         })
     }
@@ -232,7 +226,7 @@ export function ScanPage() {
     setEngineLoadError(undefined)
     setEngineLoading(true)
     setShowEngineLoading(false)
-    setEngineLabel(ENGINE_DOWNLOAD_LABEL)
+    setEngineLabel(messages.engineDownload)
     setEngineLoadAttempt((current) => current + 1)
   }
 
@@ -263,7 +257,7 @@ export function ScanPage() {
         .then(({ project: storedProject, pages: storedPages }) => {
           if (cancelled) return
           if (!storedProject) {
-            toast.error('找不到这个扫描项目')
+            toast.error(messages.projectNotFound)
             navigate('/history', { replace: true })
             return
           }
@@ -280,8 +274,8 @@ export function ScanPage() {
         })
         .catch((reason: unknown) => {
           if (cancelled) return
-          toast.error('扫描项目读取失败', {
-            description: reason instanceof Error ? reason.message : '浏览器无法读取本地存储',
+          toast.error(messages.projectReadFailed, {
+            description: reason instanceof Error ? reason.message : messages.storageReadFailed,
           })
           navigate('/history', { replace: true })
         })
@@ -333,13 +327,15 @@ export function ScanPage() {
     const requiresEngineInitialization = !scannerClient.isReady
     setProcessingProgress(0)
     setProcessingIndeterminate(requiresEngineInitialization)
-    setProcessingTitle(requiresEngineInitialization ? '首次加载图像引擎' : '正在处理照片')
+    setProcessingTitle(
+      requiresEngineInitialization ? messages.firstEngineLoad : messages.processingPhotos,
+    )
     setProcessingLabel(
       requiresEngineInitialization
-        ? ENGINE_DOWNLOAD_LABEL
+        ? messages.engineDownload
         : filesToProcess.length > 1
-          ? `正在准备第 1/${filesToProcess.length} 张照片`
-          : '正在准备照片',
+          ? messages.preparingPhotoNumber(1, filesToProcess.length)
+          : messages.preparingPhoto,
     )
     setBusy(true)
     try {
@@ -354,7 +350,7 @@ export function ScanPage() {
             onProgress: (progress, label) => {
               if (scannerClient.isReady) {
                 setProcessingIndeterminate(false)
-                setProcessingTitle('正在处理照片')
+                setProcessingTitle(messages.processingPhotos)
               }
               const batchProgress =
                 ((fileIndex + Math.max(0, Math.min(100, progress)) / 100) / filesToProcess.length) *
@@ -362,7 +358,7 @@ export function ScanPage() {
               setProcessingProgress((current) => Math.max(current, batchProgress))
               setProcessingLabel(
                 filesToProcess.length > 1
-                  ? `${label} · 第 ${fileIndex + 1}/${filesToProcess.length} 张`
+                  ? messages.photoProgress(label, fileIndex + 1, filesToProcess.length)
                   : label,
               )
             },
@@ -371,20 +367,19 @@ export function ScanPage() {
           if (isAbortError(reason)) throw reason
           setProcessingLabel(
             filesToProcess.length > 1
-              ? `正在读取第 ${fileIndex + 1}/${filesToProcess.length} 张照片`
-              : '正在读取照片',
+              ? messages.readingPhotoNumber(fileIndex + 1, filesToProcess.length)
+              : messages.readingPhoto,
           )
           detection = await fallbackDetection(file)
-          const engineTimedOut =
-            reason instanceof Error && reason.message === ENGINE_TIMEOUT_MESSAGE
+          const engineTimedOut = isEngineTimeout(reason)
           toast.warning(
-            engineTimedOut ? '图像引擎加载超时，已切换为手动裁剪' : '没有可靠识别到文档边缘',
+            engineTimedOut ? messages.engineTimeoutManualCrop : messages.unreliableEdges,
             {
               description: engineTimedOut
-                ? '照片已保留，请手动调整四角；稍后可重新识别。'
+                ? messages.photoKept
                 : reason instanceof Error
-                  ? `${reason.message}，请手动调整四角。`
-                  : '请手动调整四角。',
+                  ? messages.manualCropError(reason.message)
+                  : messages.adjustCorners,
             },
           )
         }
@@ -422,9 +417,9 @@ export function ScanPage() {
           passportLayout,
         })
       } catch (reason) {
-        toast.error('项目状态保存失败', {
+        toast.error(messages.projectSaveFailed, {
           id: 'project-state-save-error',
-          description: reason instanceof Error ? reason.message : '浏览器无法写入本地存储',
+          description: reason instanceof Error ? reason.message : messages.storageWriteFailed,
         })
       }
       if (added[0]) {
@@ -433,8 +428,8 @@ export function ScanPage() {
       }
     } catch (reason) {
       if (!isAbortError(reason))
-        toast.error('无法添加照片', {
-          description: reason instanceof Error ? reason.message : '请换一张图片重试',
+        toast.error(messages.addPhotoFailed, {
+          description: reason instanceof Error ? reason.message : messages.tryAnotherPhoto,
         })
     } finally {
       if (operationControllerRef.current === controller) operationControllerRef.current = null
@@ -460,7 +455,7 @@ export function ScanPage() {
       // Every edit replaces the page object. Only merge the saved snapshot if
       // that version is still current, keeping newer edits and other pages.
       setPages((current) => current.map((page) => (page === active ? saved : page)))
-      toast.success('页面已保存到本地')
+      toast.success(messages.pageSaved)
       if (
         mode === 'id-card' &&
         activeRef.current === active &&
@@ -468,12 +463,12 @@ export function ScanPage() {
       ) {
         setActivePageId(undefined)
         setStage('capture')
-        toast('请继续拍摄身份证另一面')
+        toast(messages.captureOtherSide)
       }
     } catch (reason) {
-      toast.error('页面保存失败', {
+      toast.error(messages.pageSaveFailed, {
         id: 'page-save-error',
-        description: reason instanceof Error ? reason.message : '浏览器无法写入本地存储',
+        description: reason instanceof Error ? reason.message : messages.storageWriteFailed,
       })
     } finally {
       saveInFlightRef.current = false
@@ -500,9 +495,9 @@ export function ScanPage() {
             ? previousProject
             : current,
         )
-        toast.error('护照版式保存失败', {
+        toast.error(messages.passportLayoutSaveFailed, {
           id: 'passport-layout-save-error',
-          description: reason instanceof Error ? reason.message : '浏览器无法写入本地存储',
+          description: reason instanceof Error ? reason.message : messages.storageWriteFailed,
         })
       }
     }
@@ -513,9 +508,9 @@ export function ScanPage() {
     const updated = { ...project, name, updatedAt: Date.now() }
     setProject(updated)
     void db.projects.put(updated).catch((reason: unknown) => {
-      toast.error('项目名称保存失败', {
+      toast.error(messages.projectNameSaveFailed, {
         id: 'project-name-save-error',
-        description: reason instanceof Error ? reason.message : '浏览器无法写入本地存储',
+        description: reason instanceof Error ? reason.message : messages.storageWriteFailed,
       })
     })
   }
@@ -542,10 +537,10 @@ export function ScanPage() {
         setStage(remaining.length ? (remaining[0].cropConfirmed ? 'enhance' : 'crop') : 'capture')
       }
       setPendingDelete(undefined)
-      toast.success('页面已删除')
+      toast.success(messages.pageDeleted)
     } catch (reason) {
-      toast.error('页面删除失败', {
-        description: reason instanceof Error ? reason.message : '请稍后重试',
+      toast.error(messages.pageDeleteFailed, {
+        description: reason instanceof Error ? reason.message : messages.retryLater,
       })
     } finally {
       setDeletingPage(false)
@@ -569,9 +564,9 @@ export function ScanPage() {
       await bulkUpdatePageOrder(reordered)
       setPages((current) => mergePageOrder(current, reordered))
     } catch (reason) {
-      toast.error('页面顺序保存失败', {
+      toast.error(messages.pageOrderSaveFailed, {
         id: 'page-order-save-error',
-        description: reason instanceof Error ? reason.message : '浏览器无法写入本地存储',
+        description: reason instanceof Error ? reason.message : messages.storageWriteFailed,
       })
     } finally {
       reorderInFlightRef.current = false
@@ -586,8 +581,12 @@ export function ScanPage() {
     const requiresEngineInitialization = !scannerClient.isReady
     setProcessingProgress(0)
     setProcessingIndeterminate(requiresEngineInitialization)
-    setProcessingTitle(requiresEngineInitialization ? '首次加载图像引擎' : '正在重新识别边缘')
-    setProcessingLabel(requiresEngineInitialization ? ENGINE_DOWNLOAD_LABEL : '正在准备重新识别')
+    setProcessingTitle(
+      requiresEngineInitialization ? messages.firstEngineLoad : messages.redetecting,
+    )
+    setProcessingLabel(
+      requiresEngineInitialization ? messages.engineDownload : messages.preparingRedetection,
+    )
     setBusy(true)
     try {
       const detection = await scannerClient.detect(active.source, mode, passportLayout, {
@@ -595,7 +594,7 @@ export function ScanPage() {
         onProgress: (progress, label) => {
           if (scannerClient.isReady) {
             setProcessingIndeterminate(false)
-            setProcessingTitle('正在重新识别边缘')
+            setProcessingTitle(messages.redetecting)
           }
           setProcessingProgress((current) => Math.max(current, progress))
           setProcessingLabel(label)
@@ -608,11 +607,11 @@ export function ScanPage() {
         cropConfirmed: false,
         updatedAt: Date.now(),
       }))
-      toast.success('已重新识别边缘')
+      toast.success(messages.redetected)
     } catch (reason) {
       if (!isAbortError(reason))
-        toast.error('重新识别失败', {
-          description: reason instanceof Error ? reason.message : '请手动调整四角',
+        toast.error(messages.redetectionFailed, {
+          description: reason instanceof Error ? reason.message : messages.adjustCornersRetry,
         })
     } finally {
       if (operationControllerRef.current === controller) operationControllerRef.current = null
@@ -683,9 +682,9 @@ export function ScanPage() {
         clearPreview()
         setStage('crop')
       }
-      toast.error('裁剪确认保存失败', {
+      toast.error(messages.cropConfirmSaveFailed, {
         id: 'crop-confirmation-save-error',
-        description: reason instanceof Error ? reason.message : '浏览器无法写入本地存储',
+        description: reason instanceof Error ? reason.message : messages.storageWriteFailed,
       })
     })
     setStage('enhance')
@@ -699,9 +698,9 @@ export function ScanPage() {
     void updatePageMetadata(unconfirmed).catch((reason: unknown) => {
       updateActive((page) => ({ ...page, cropConfirmed: true }))
       if (activeRef.current?.id === unconfirmed.id) setStage('enhance')
-      toast.error('裁剪状态保存失败', {
+      toast.error(messages.cropStateSaveFailed, {
         id: 'crop-confirmation-save-error',
-        description: reason instanceof Error ? reason.message : '浏览器无法写入本地存储',
+        description: reason instanceof Error ? reason.message : messages.storageWriteFailed,
       })
     })
     setStage('crop')
@@ -713,7 +712,7 @@ export function ScanPage() {
         className="grid min-h-[calc(100svh-4rem)] place-items-center text-sm text-muted-foreground"
         role="status"
       >
-        正在打开扫描项目…
+        {messages.openingProject}
       </div>
     )
   }
@@ -785,7 +784,7 @@ export function ScanPage() {
         open={showEngineLoading || busy}
         progress={processingProgress}
         indeterminate={showEngineLoading || processingIndeterminate}
-        title={showEngineLoading ? '首次加载图像引擎' : processingTitle}
+        title={showEngineLoading ? messages.firstEngineLoad : processingTitle}
         label={showEngineLoading ? engineLabel : processingLabel}
       />
       {engineLoadError && (
@@ -796,13 +795,17 @@ export function ScanPage() {
           <div className="flex items-start gap-3">
             <TriangleAlert className="mt-0.5 size-5 shrink-0 text-destructive" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold">{engineLoadError.title}</p>
+              <p className="text-sm font-bold">
+                {engineLoadError.timedOut ? messages.engineTimeout : messages.engineLoadFailed}
+              </p>
               <p className="mt-1 break-words text-xs leading-5 text-muted-foreground">
-                {engineLoadError.description}
+                {engineLoadError.reason
+                  ? messages.networkError(engineLoadError.reason)
+                  : messages.networkRetry}
               </p>
             </div>
             <Button size="sm" onClick={retryEngine}>
-              重新加载
+              {messages.reload}
             </Button>
           </div>
         </div>

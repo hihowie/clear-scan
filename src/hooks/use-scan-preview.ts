@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { createRenderCacheKey, isAbortError, scannerClient } from '@/lib/scanner-client'
 import type { ScanPage } from '@/lib/types'
+import { messages } from '@/lib/i18n'
 
 interface RenderedPreview {
   pageId: string
@@ -73,11 +74,11 @@ export function useScanPreview(page: ScanPage | undefined, enabled: boolean) {
         })
         .catch((reason: unknown) => {
           if (!cancelled && !isAbortError(reason))
-            toast.error('预览生成失败', {
+            toast.error(messages.previewFailed, {
               id: 'preview-render-error',
-              description: reason instanceof Error ? reason.message : '请重试',
+              description: reason instanceof Error ? reason.message : messages.retry,
               action: {
-                label: '重新生成',
+                label: messages.regenerate,
                 onClick: () => setRetryVersion((current) => current + 1),
               },
               duration: Infinity,

@@ -1,0 +1,65 @@
+{
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "name": "Clear Scan",
+  "short_name": "Clear Scan",
+  "description": "An ID and document scanner that processes every image on your device",
+  "theme_color": "#087f5b",
+  "background_color": "#f7f8f4",
+  "display": "standalone",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Scan ID card",
+      "short_name": "ID card",
+      "url": "./#/scan/id-card",
+      "icons": [
+        {
+          "src": "pwa-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Scan passport",
+      "short_name": "Passport",
+      "url": "./#/scan/passport",
+      "icons": [
+        {
+          "src": "pwa-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Scan document",
+      "short_name": "Document",
+      "url": "./#/scan/document",
+      "icons": [
+        {
+          "src": "pwa-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

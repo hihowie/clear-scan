@@ -3,6 +3,7 @@ import { distance, orderPoints } from '@/lib/geometry'
 import type { ScanPage } from '@/lib/types'
 import { createLightingResult, processEffects, processEffectsFromLighting } from './image-enhancer'
 import { blobToImageData } from './worker-image-utils'
+import { messages } from '@/lib/i18n'
 
 const MAX_CACHED_MAT_BYTES = 8 * 1024 * 1024
 
@@ -153,7 +154,7 @@ export async function renderPage(
   let base = cacheIntermediate && previewCache?.baseKey === baseKey ? previewCache.base : undefined
   let ownsBase = false
 
-  onProgress?.(42, '正在校正透视')
+  onProgress?.(42, messages.correctingPerspective)
   if (!base) {
     base = await preparePageBase(cv, page, maxEdge)
     if (!cacheIntermediate || !cacheBase(page.id, baseKey, base)) ownsBase = true
@@ -161,7 +162,7 @@ export async function renderPage(
 
   let filtered: Mat | undefined
   try {
-    onProgress?.(68, '正在应用增强效果')
+    onProgress?.(68, messages.applyingEffects)
     if (!cacheIntermediate || previewCache?.base !== base) {
       filtered = processEffects(cv, base, page.effects, page.adjustments)
     } else {
@@ -187,7 +188,7 @@ export async function renderPage(
 
     const canvas = new OffscreenCanvas(filtered.cols, filtered.rows)
     const context = canvas.getContext('2d')
-    if (!context) throw new Error('无法生成扫描结果')
+    if (!context) throw new Error(messages.renderFailed)
     const pixels = new Uint8ClampedArray(
       filtered.data.buffer as ArrayBuffer,
       filtered.data.byteOffset,
@@ -195,7 +196,7 @@ export async function renderPage(
     )
     context.putImageData(new ImageData(pixels, filtered.cols, filtered.rows), 0, 0)
     const blob = await canvas.convertToBlob({ type: mimeType, quality })
-    onProgress?.(100, '处理完成')
+    onProgress?.(100, messages.processingComplete)
     return { blob, width: filtered.cols, height: filtered.rows }
   } finally {
     if (ownsBase) base.delete()

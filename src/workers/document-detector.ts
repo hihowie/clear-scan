@@ -13,6 +13,7 @@ import {
 import { clamp, orderPoints } from '@/lib/geometry'
 import type { NormalizedQuad, PassportLayout, Point, ScanMode } from '@/lib/types'
 import { percentile, scaledOdd } from './worker-image-utils'
+import { messages } from '@/lib/i18n'
 
 function expectedRatio(mode: ScanMode, passportLayout?: PassportLayout) {
   if (mode === 'id-card') return 85.6 / 53.98
@@ -504,7 +505,7 @@ export function findDocumentQuad(
     combined = cv.Mat.zeros(source.rows, source.cols, cv.CV_8UC1)
     for (const edgeMap of edgeMaps) cv.bitwise_or(combined, edgeMap.mat, combined)
 
-    onProgress?.(68, '正在评分轮廓候选')
+    onProgress?.(68, messages.scoringContours)
     const rawCandidates = edgeMaps.flatMap((edgeMap) =>
       collectContourCandidates(cv, edgeMap.mat, edgeMap.source),
     )
@@ -513,7 +514,7 @@ export function findDocumentQuad(
     let candidates = suppressNestedCandidates(
       deduplicateCandidates(evaluatedCandidates, source.cols, source.rows),
     )
-    onProgress?.(82, '正在补全缺失边线')
+    onProgress?.(82, messages.completingEdges)
     const initialConfidence = calibrateDetectionConfidence(candidates[0], candidates[1])
     const needsLineRecovery =
       !candidates[0] || candidates[0].score < 0.74 || initialConfidence < 0.72
@@ -541,7 +542,7 @@ export function findDocumentQuad(
 
     const best = candidates[0]
     if (best && houghLines.length) {
-      onProgress?.(91, '正在精修文档四角')
+      onProgress?.(91, messages.refiningCorners)
       const refinedCorners = refineCandidateWithLines(best, houghLines, source.cols, source.rows)
       if (refinedCorners) {
         const refined = evaluateCandidates(

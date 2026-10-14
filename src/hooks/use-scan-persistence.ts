@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { db, updatePageMetadata } from '@/lib/db'
 import type { ScanPage, ScanProject } from '@/lib/types'
+import { messages } from '@/lib/i18n'
 
 export function useScanPersistence(page: ScanPage | undefined, project: ScanProject | undefined) {
   const pageRef = useRef(page)
@@ -20,9 +21,9 @@ export function useScanPersistence(page: ScanPage | undefined, project: ScanProj
         updatePageMetadata({ ...latestPage, updatedAt }),
       ])
     } catch (reason) {
-      toast.error(automatic ? '自动保存失败' : '页面保存失败', {
+      toast.error(automatic ? messages.autosaveFailed : messages.pageSaveFailed, {
         id: automatic ? 'scan-autosave-error' : 'scan-flush-error',
-        description: reason instanceof Error ? reason.message : '浏览器无法写入本地存储',
+        description: reason instanceof Error ? reason.message : messages.storageWriteFailed,
       })
     }
   }, [])

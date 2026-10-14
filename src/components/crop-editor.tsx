@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import type { CornerSource, NormalizedQuad } from '@/lib/types'
 import { clamp } from '@/lib/geometry'
 import { cn } from '@/lib/utils'
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 interface ActiveDrag {
   index: number
@@ -78,6 +80,7 @@ export function CropEditor({
   cornerSource: CornerSource
   onChange: (corners: NormalizedQuad) => void
 }) {
+  useLocale()
   const containerRef = useRef<HTMLDivElement>(null)
   const [draftCorners, setDraftCorners] = useState(() => cloneCorners(corners))
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined)
@@ -212,7 +215,7 @@ export function CropEditor({
       >
         <img
           src={sourceUrl}
-          alt="待裁剪文档"
+          alt={messages.cropImageAlt}
           className="pointer-events-none size-full object-fill"
           draggable={false}
         />
@@ -274,7 +277,7 @@ export function CropEditor({
               />
               <button
                 type="button"
-                aria-label={`拖动第 ${index + 1} 个裁剪点`}
+                aria-label={messages.cropHandle(index + 1)}
                 className={cn(
                   'absolute z-20 grid size-12 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center rounded-full bg-transparent outline-none transition-transform hover:scale-105 focus-visible:ring-4 focus-visible:ring-white/75',
                   activeIndex === index && 'scale-110',
@@ -337,10 +340,10 @@ export function CropEditor({
           className="pointer-events-none absolute -top-10 left-0 shadow-sm"
         >
           {cornerSource === 'detected'
-            ? '已预识别边缘，请人工确认'
+            ? messages.cropDetectedHint
             : cornerSource === 'manual'
-              ? '已手动调整边缘'
-              : '未可靠识别，请拖动四角'}
+              ? messages.cropAdjustedHint
+              : messages.cropFallbackHint}
         </Badge>
       </div>
     </div>

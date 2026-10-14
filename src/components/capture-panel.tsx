@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import type { PageRole, PassportLayout, ScanMode } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 export function CapturePanel({
   mode,
@@ -23,6 +25,7 @@ export function CapturePanel({
   onPassportLayoutChange: (layout: PassportLayout) => void
   onFiles: (files: File[]) => void
 }) {
+  useLocale()
   const cameraInput = useRef<HTMLInputElement>(null)
   const uploadInput = useRef<HTMLInputElement>(null)
   const [webcamOpen, setWebcamOpen] = useState(false)
@@ -30,12 +33,12 @@ export function CapturePanel({
 
   const title =
     mode === 'id-card'
-      ? `拍摄身份证${nextRole === 'front' ? '人像面' : '国徽面'}`
+      ? messages.captureIdSide(nextRole === 'front' ? messages.frontSide : messages.backSide)
       : mode === 'passport'
         ? passportLayout === 'spread'
-          ? '拍摄护照展开双页'
-          : '拍摄护照资料页'
-        : '添加文档页面'
+          ? messages.capturePassportSpread
+          : messages.capturePassportData
+        : messages.addDocumentPages
   const Icon = mode === 'id-card' ? CreditCard : mode === 'passport' ? Plane : FileImage
 
   const receive = (list: FileList | null) => {
@@ -44,12 +47,11 @@ export function CapturePanel({
       (file) => file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name),
     )
     if (!files.length) {
-      toast.error('没有可用的图片', { description: '请选择 JPEG、PNG、WebP、HEIC 或 HEIF 文件。' })
+      toast.error(messages.noUsableImages, { description: messages.supportedFiles })
       return
     }
-    if (files.length < list.length)
-      toast.warning(`已跳过 ${list.length - files.length} 个不支持的文件`)
-    if (mode !== 'document' && files.length > 1) toast('证件模式每次只添加一张照片')
+    if (files.length < list.length) toast.warning(messages.skippedFiles(list.length - files.length))
+    if (mode !== 'document' && files.length > 1) toast(messages.singleIdPhoto)
     onFiles(mode === 'document' ? files : files.slice(0, 1))
   }
 
@@ -59,11 +61,15 @@ export function CapturePanel({
         <Icon className="size-7" />
       </div>
       <Badge className="mt-4">
-        {mode === 'id-card' ? '双面合成' : mode === 'passport' ? '护照专用比例' : '支持连续多页'}
+        {mode === 'id-card'
+          ? messages.bothSides
+          : mode === 'passport'
+            ? messages.passportRatio
+            : messages.multiplePages}
       </Badge>
       <h2 className="mt-3 text-center text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>
       <p className="mt-2 max-w-lg text-center text-sm leading-6 text-muted-foreground">
-        保持镜头与纸面平行，避免强光直射。照片返回后会自动寻找边缘，你仍可手动调整四角。
+        {messages.captureHint}
       </p>
 
       {mode === 'passport' && (
@@ -79,7 +85,7 @@ export function CapturePanel({
                 passportLayout === layout && 'bg-background text-foreground shadow-sm',
               )}
             >
-              {layout === 'data-page' ? '资料页单页' : '展开双页'}
+              {layout === 'data-page' ? messages.passportDataPage : messages.passportSpread}
             </button>
           ))}
         </div>
@@ -106,14 +112,12 @@ export function CapturePanel({
       >
         <div className="rounded-[1.3rem] bg-muted/65 px-5 py-8 text-center sm:px-10 sm:py-10">
           <CloudUpload className="mx-auto size-9 text-primary/70" />
-          <h3 className="mt-3 text-sm font-bold">使用系统相机获得更清晰的原图</h3>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            也可以拖放照片到这里。支持 JPEG、PNG、WebP 和浏览器可解码的 HEIC。
-          </p>
+          <h3 className="mt-3 text-sm font-bold">{messages.systemCameraHint}</h3>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{messages.dropHint}</p>
           <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
             <Button size="lg" disabled={busy} onClick={() => cameraInput.current?.click()}>
               <Camera />
-              系统相机拍摄
+              {messages.useSystemCamera}
             </Button>
             <Button
               size="lg"
@@ -122,7 +126,7 @@ export function CapturePanel({
               onClick={() => uploadInput.current?.click()}
             >
               <Images />
-              从相册或电脑上传
+              {messages.uploadPhotos}
             </Button>
           </div>
           <button
@@ -132,15 +136,15 @@ export function CapturePanel({
             className="mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-muted-foreground transition hover:bg-background hover:text-primary"
           >
             <Laptop className="size-3.5" />
-            使用网页摄像头
+            {messages.useWebcam}
           </button>
         </div>
       </Card>
 
       <div className="mt-5 grid w-full grid-cols-3 gap-2 text-center text-[10px] font-semibold text-muted-foreground">
-        <span>1. 拍照/上传</span>
-        <span>2. 确认边缘</span>
-        <span>3. 增强并导出</span>
+        <span>{messages.captureStepNumbered}</span>
+        <span>{messages.cropStepNumbered}</span>
+        <span>{messages.enhanceStepNumbered}</span>
       </div>
       <input
         ref={cameraInput}

@@ -18,6 +18,8 @@ import type {
   ScanPage,
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { messages } from '@/lib/i18n'
+import { useLocale } from '@/hooks/use-locale'
 
 type EditorStage = Exclude<ScanStage, 'capture'>
 type RotationDirection = 'counterclockwise' | 'clockwise'
@@ -102,12 +104,13 @@ function CropControls({
   onRedetect: () => void
   onConfirm: () => void
 }) {
+  useLocale()
   const status =
     page.cornerSource === 'detected'
-      ? '预识别结果待确认'
+      ? messages.cropDetectedStatus
       : page.cornerSource === 'manual'
-        ? '已手动调整，等待确认'
-        : '需要手动调整'
+        ? messages.cropManualStatus
+        : messages.cropRequiredStatus
 
   return (
     <div className="space-y-5">
@@ -121,26 +124,24 @@ function CropControls({
         >
           {status}
         </Badge>
-        <h2 className="mt-3 text-xl font-bold">确认四个角点</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          拖动边框外侧的绿色圆柄，让短线所指的角点贴合证件或纸张；拖动时可通过放大镜精确对齐。
-        </p>
+        <h2 className="mt-3 text-xl font-bold">{messages.confirmCorners}</h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">{messages.cropInstructions}</p>
       </div>
       <div className="rounded-2xl bg-muted p-4 text-xs leading-5 text-muted-foreground">
-        <p className="font-bold text-foreground">裁剪小技巧</p>
+        <p className="font-bold text-foreground">{messages.cropTips}</p>
         <ul className="mt-2 space-y-1.5">
-          <li>· 边缘宁可稍微向内，不要带入桌面背景</li>
-          <li>· 护照展开双页应包含完整装订线</li>
-          <li>· 旋转可以在下一步继续调整</li>
+          <li>{messages.cropTipInside}</li>
+          <li>{messages.cropTipPassport}</li>
+          <li>{messages.cropTipRotate}</li>
         </ul>
       </div>
       <Button variant="outline" size="lg" className="w-full" disabled={busy} onClick={onRedetect}>
         <RotateCcw />
-        重新识别
+        {messages.redetect}
       </Button>
       <Button size="lg" className="w-full" disabled={busy} onClick={onConfirm}>
         <Check />
-        确认裁剪
+        {messages.confirmCrop}
       </Button>
     </div>
   )
@@ -167,13 +168,12 @@ function EnhancementControls({
   onReopenCrop: () => void
   onSave: () => void
 }) {
+  useLocale()
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-xl font-bold">调整扫描效果</h2>
-        <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-          不同分类可以叠加，同一分类始终只保留一个效果。
-        </p>
+        <h2 className="text-xl font-bold">{messages.adjustEffects}</h2>
+        <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{messages.effectsHint}</p>
       </div>
       <FilterPanel
         effects={page.effects}
@@ -187,11 +187,11 @@ function EnhancementControls({
       <div className="mt-6 grid grid-cols-2 gap-2">
         <Button variant="outline" onClick={onReopenCrop}>
           <Crop />
-          调整边缘
+          {messages.adjustEdges}
         </Button>
         <Button disabled={!previewIsCurrent || rendering} onClick={onSave}>
           <FileCheck2 />
-          保存页面
+          {messages.savePage}
         </Button>
       </div>
     </div>
@@ -235,6 +235,7 @@ export function ScanEditorWorkspace({
   onReopenCrop: () => void
   onSave: () => void
 }) {
+  useLocale()
   return (
     <>
       <section
@@ -257,7 +258,7 @@ export function ScanEditorWorkspace({
             <div className="flex size-full items-center justify-center p-4 sm:p-8">
               <img
                 src={previewUrl}
-                alt="扫描增强预览"
+                alt={messages.previewAlt}
                 className={cn(
                   'max-h-full max-w-full object-contain shadow-[0_20px_65px_rgba(0,0,0,.5)] transition-opacity',
                   (rendering || !previewIsCurrent) && 'opacity-55',
@@ -272,14 +273,14 @@ export function ScanEditorWorkspace({
             >
               <div className="flex flex-col items-center gap-3 text-white/75">
                 <LoaderCircle className="size-8 animate-spin" />
-                <span className="text-xs font-semibold">正在生成增强预览</span>
+                <span className="text-xs font-semibold">{messages.generatingPreview}</span>
               </div>
             </div>
           ))}
         {(rendering || !previewIsCurrent) && previewUrl && (
           <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-[10px] font-semibold text-white backdrop-blur">
             <LoaderCircle className="size-3 animate-spin" />
-            正在更新效果
+            {messages.updatingEffects}
           </div>
         )}
       </section>

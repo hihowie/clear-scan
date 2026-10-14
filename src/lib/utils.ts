@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { locale, messages } from './i18n'
 
 let idCounter = 0
 
@@ -29,7 +30,7 @@ export function createId() {
 }
 
 export function formatDate(timestamp: number) {
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(locale, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -43,7 +44,7 @@ export function sanitizeFileName(value: string) {
     .replace(/[\\/:*?"<>|\p{Cc}]/gu, '-')
     .replace(/\s+/g, ' ')
     .slice(0, 80)
-  return cleaned || '清晰扫描'
+  return cleaned || messages.appName
 }
 
 export function downloadBlob(blob: Blob, fileName: string) {
@@ -56,10 +57,15 @@ export function downloadBlob(blob: Blob, fileName: string) {
 }
 
 export function modeDefaultName(mode: string) {
-  const date = new Intl.DateTimeFormat('zh-CN', {
+  const date = new Intl.DateTimeFormat(locale, {
     month: '2-digit',
     day: '2-digit',
   }).format(Date.now())
-  const prefix = mode === 'id-card' ? '身份证' : mode === 'passport' ? '护照' : '扫描文档'
+  const prefix =
+    mode === 'id-card'
+      ? messages.idCard
+      : mode === 'passport'
+        ? messages.passport
+        : messages.documentName
   return `${prefix} ${date}`
 }

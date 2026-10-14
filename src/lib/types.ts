@@ -1,3 +1,5 @@
+import type { Locale } from './i18n'
+
 export type ScanMode = 'id-card' | 'passport' | 'document'
 
 export type PassportLayout = 'data-page' | 'spread'
@@ -90,6 +92,7 @@ export interface RenderOptions {
 
 interface WorkerRequestBase {
   id: string
+  locale: Locale
 }
 
 export type ScannerWorkerRequest =
@@ -146,10 +149,4 @@ export const SMART_EFFECTS: EnhancementEffects = {
   glare: 'deglare',
   color: 'enhanced-color',
   detail: 'sharpen',
-}
-
-export const MODE_LABELS: Record<ScanMode, string> = {
-  'id-card': '身份证扫描',
-  passport: '护照扫描',
-  document: '文档扫描',
 }
