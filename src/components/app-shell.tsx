@@ -77,7 +77,7 @@ export function AppShell() {
             <LanguageButton />
             <Button asChild variant="ghost" size="icon" className="sm:hidden">
               <a
-                href="https://github.com/rmb122/clear-scan"
+                href="https://github.com/hihowie/clear-scan"
                 target="_blank"
                 rel="noreferrer"
                 aria-label={messages.viewSource}
@@ -87,7 +87,7 @@ export function AppShell() {
             </Button>
             <Button asChild variant="outline" size="sm" className="hidden text-sm sm:inline-flex">
               <a
-                href="https://github.com/rmb122/clear-scan"
+                href="https://github.com/hihowie/clear-scan"
                 target="_blank"
                 rel="noreferrer"
                 aria-label={messages.viewSource}

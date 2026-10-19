@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, PDFPage } from 'pdf-lib'
 
 const { renderMock } = vi.hoisted(() => ({
   renderMock: vi.fn(),
@@ -115,5 +115,41 @@ describe('content-sized PDF export', () => {
     expect(size.width).toBeCloseTo(pdfWidth)
     expect(size.height).toBeCloseTo(pdfHeight)
     expect(size.width / size.height).toBeCloseTo(width / height)
+  })
+})
+
+describe('ID card physical PDF placement', () => {
+  it('places the composed A4 sheet edge to edge without shrinking the cards', async () => {
+    renderMock.mockReset()
+    renderMock.mockResolvedValue({ blob: new Blob(['image']), width: 1000, height: 630 })
+    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({ close: vi.fn() }))
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D)
+    const png = new Uint8Array(
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2n9sAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    )
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) =>
+      callback(new Blob([png], { type: 'image/png' })),
+    )
+    const draw = vi.spyOn(PDFPage.prototype, 'drawImage')
+    const result = await exportProject(
+      makeProject({ mode: 'id-card' }),
+      [makePage({ role: 'front' }), makePage({ id: 'back', role: 'back', order: 1 })],
+      'pdf',
+      'a4',
+    )
+    expect(draw).toHaveBeenCalledWith(expect.anything(), {
+      x: 0,
+      y: 0,
+      width: 595.28,
+      height: 841.89,
+    })
+    const pdf = await PDFDocument.load(await result.blob.arrayBuffer())
+    expect(pdf.getPageCount()).toBe(1)
   })
 })

@@ -1,3 +1,13 @@
+# ID Copy fork
+
+This fork of [Clear Scan](https://github.com/rmb122/clear-scan) adds a simplified Chinese ID-copy homepage. Photos on the homepage stay in memory, with no history storage. It supports automatic detection, perspective correction, manual corner adjustment, rotation, grayscale, purpose watermarks, A4 preview, PDF/PNG download and printing. Each side is placed at 85.6 × 53.98 mm on an A4 sheet. Print at 100% / actual size.
+
+The original full scanner remains at `/#/tools` and still saves its projects to IndexedDB. Source: https://github.com/hihowie/clear-scan. License: AGPL-3.0-only. Import the repository into Vercel using the committed `vercel.json`; no environment variables are needed.
+
+The upstream documentation follows.
+
+---
+
 <p align="center">
   <img src="./public/pwa-192.png" width="96" height="96" alt="Clear Scan icon" />
 </p>
@@ -37,13 +47,13 @@ The interface supports Simplified Chinese and English. By default, the app picks
 
 ### Three scan modes
 
-| Mode     | Main capabilities                                                                        | Typical output                                                       |
-| -------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| ID card  | Guided capture for both sides, standard card-ratio detection, and perspective correction | Both sides arranged as large images on one A4 page; JPG, PNG, or PDF |
-| Passport | Dedicated ratios for a single biodata page or a full two-page spread                     | JPG, PNG, or PDF; multi-page projects can use PDF or ZIP             |
-| Document | Batch import, continuous capture, page reordering, and multi-page management             | Single-page JPG/PNG, multi-page PDF, or a ZIP of JPG files           |
+| Mode     | Main capabilities                                                                        | Typical output                                                        |
+| -------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| ID card  | Guided capture for both sides, standard card-ratio detection, and perspective correction | Both sides arranged at physical size on one A4 page; JPG, PNG, or PDF |
+| Passport | Dedicated ratios for a single biodata page or a full two-page spread                     | JPG, PNG, or PDF; multi-page projects can use PDF or ZIP              |
+| Document | Batch import, continuous capture, page reordering, and multi-page management             | Single-page JPG/PNG, multi-page PDF, or a ZIP of JPG files            |
 
-> The A4 ID-card layout prioritizes legibility by enlarging both sides. It is not a 1:1 physical-size photocopy.
+> This fork places ID cards at physical size. Print at 100% / actual size.
 
 ### Capture and cropping
 
@@ -71,12 +81,12 @@ The interface supports Simplified Chinese and English. By default, the app picks
 - Export is generated locally without a server-side conversion service.
 - Exported JPG and PNG files are re-encoded and do not retain the source photo's EXIF or location metadata.
 
-| Format | Best for                                       | Notes                                                                                       |
-| ------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| PDF    | Document archiving and multi-page scans        | Documents can fit their content or use uniform A4 pages; ID cards use one enlarged A4 sheet |
-| JPG    | A single page or a combined two-sided ID image | Broad compatibility with lossy compression                                                  |
-| PNG    | A single page or a combined two-sided ID image | Lossless, but generally larger                                                              |
-| ZIP    | Multi-page passport or document projects       | Renders every page as a separate JPG and packages them together                             |
+| Format | Best for                                       | Notes                                                                                            |
+| ------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| PDF    | Document archiving and multi-page scans        | Documents can fit their content or use uniform A4 pages; ID cards use one physical-size A4 sheet |
+| JPG    | A single page or a combined two-sided ID image | Broad compatibility with lossy compression                                                       |
+| PNG    | A single page or a combined two-sided ID image | Lossless, but generally larger                                                                   |
+| ZIP    | Multi-page passport or document projects       | Renders every page as a separate JPG and packages them together                                  |
 
 ## Workflow
 

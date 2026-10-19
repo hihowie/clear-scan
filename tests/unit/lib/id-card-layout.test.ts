@@ -2,31 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { getIdCardSheetLayout } from '@/lib/id-card-layout'
 
 describe('ID card sheet layout', () => {
-  it('gives both sides most of the width on an A4 export', () => {
-    const canvasWidth = 2480
-    const canvasHeight = 3508
-    const layout = getIdCardSheetLayout(canvasWidth, canvasHeight)
-
-    expect(layout.front.width / canvasWidth).toBeCloseTo(0.8, 2)
-    expect(layout.front).toMatchObject({
-      x: layout.back.x,
-      width: layout.back.width,
-      height: layout.back.height,
-    })
-    expect(layout.front.y).toBeGreaterThan(0)
-    expect(layout.back.y + layout.back.height).toBeLessThan(canvasHeight)
-
-    const cardArea = layout.front.width * layout.front.height * 2
-    expect(cardArea / (canvasWidth * canvasHeight)).toBeGreaterThan(0.5)
-  })
-
-  it('keeps the cards inside a shorter canvas', () => {
-    const canvasWidth = 1200
-    const canvasHeight = 1000
-    const layout = getIdCardSheetLayout(canvasWidth, canvasHeight)
-
-    expect(layout.front.x).toBeGreaterThanOrEqual(0)
-    expect(layout.front.y).toBeGreaterThanOrEqual(0)
-    expect(layout.back.y + layout.back.height).toBeLessThanOrEqual(canvasHeight)
+  it('preserves physical card dimensions and a 15 mm gap on an A4 sheet', () => {
+    for (const [width, height] of [
+      [2480, 3508],
+      [1240, 1754],
+    ]) {
+      const { front, back } = getIdCardSheetLayout(width, height)
+      expect((front.width / width) * 210).toBeCloseTo(85.6, 5)
+      expect((front.height / height) * 297).toBeCloseTo(53.98, 5)
+      expect(((back.y - front.y - front.height) / height) * 297).toBeCloseTo(15, 5)
+      expect(back.width).toBe(front.width)
+      expect(back.x).toBe(front.x)
+      expect(front.x * 2 + front.width).toBeCloseTo(width, 5)
+      expect(back.y + back.height).toBeLessThan(height)
+    }
   })
 })

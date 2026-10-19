@@ -5,6 +5,7 @@ import {
   RouteLoadingFallback,
   ScannerRouteLoadingFallback,
 } from '@/components/route-loading-overlay'
+import { QuickCopyPage } from '@/pages/quick-copy-page'
 import { HomePage } from '@/pages/home-page'
 
 const HistoryPage = lazy(() =>
@@ -30,8 +31,9 @@ export default function App() {
   return (
     <HashRouter>
       <Routes>
+        <Route index element={<QuickCopyPage />} />
         <Route element={<AppShell />}>
-          <Route index element={<HomePage />} />
+          <Route path="tools" element={<HomePage />} />
           <Route
             path="history"
             element={

@@ -157,3 +157,34 @@ a {
     transform: translateX(95%);
   }
 }
+
+.copy-print-sheet {
+  display: none;
+}
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    background: white;
+  }
+  body:has(.copy-print-sheet) > * {
+    display: none !important;
+  }
+  body > .copy-print-sheet {
+    display: block !important;
+    width: 210mm;
+    height: 297mm;
+    overflow: hidden;
+  }
+  .copy-print-sheet img {
+    display: block;
+    width: 210mm;
+    height: 297mm;
+  }
+}

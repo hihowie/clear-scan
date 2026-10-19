@@ -44,10 +44,11 @@ async function renderScanPage(page: ScanPage, mimeType: 'image/jpeg' | 'image/pn
   )
 }
 
-async function composeIdCard(
+export async function composeIdCard(
   pages: ScanPage[],
   mimeType: 'image/jpeg' | 'image/png',
   onProgress?: (value: number, label: string) => void,
+  watermark = '',
 ) {
   const front = pages.find((page) => page.role === 'front')
   const back = pages.find((page) => page.role === 'back')
@@ -81,6 +82,29 @@ async function composeIdCard(
     layout.front.height,
   )
   context.drawImage(backBitmap, layout.back.x, layout.back.y, layout.back.width, layout.back.height)
+  if (watermark.trim()) {
+    await document.fonts.ready
+    for (const rectangle of [layout.front, layout.back]) {
+      context.save()
+      context.beginPath()
+      context.rect(rectangle.x, rectangle.y, rectangle.width, rectangle.height)
+      context.clip()
+      context.translate(rectangle.x + rectangle.width / 2, rectangle.y + rectangle.height / 2)
+      context.rotate(-Math.PI / 8)
+      context.font = `500 ${Math.round(rectangle.width * 0.027)}px "PingFang SC", "Microsoft YaHei", sans-serif`
+      context.fillStyle = 'rgba(90, 90, 90, 0.3)'
+      context.textAlign = 'center'
+      for (let row = -3; row <= 3; row += 1) {
+        context.fillText(
+          watermark.trim().slice(0, 60),
+          0,
+          row * rectangle.height * 0.22,
+          rectangle.width * 0.95,
+        )
+      }
+      context.restore()
+    }
+  }
   frontBitmap.close()
   backBitmap.close()
 
@@ -103,6 +127,10 @@ async function createPdf(renderedPages: RenderedPage[], layout: PdfLayout, force
     const useA4 = forceA4 || layout === 'a4'
     if (useA4) {
       const page = pdf.addPage([A4_POINTS.width, A4_POINTS.height])
+      if (forceA4) {
+        page.drawImage(image, { x: 0, y: 0, width: A4_POINTS.width, height: A4_POINTS.height })
+        continue
+      }
       const placement = fitWithin(
         rendered.width,
         rendered.height,
@@ -139,6 +167,7 @@ export async function exportProject(
   format: ExportFormat,
   layout: PdfLayout,
   onProgress?: (value: number, label: string) => void,
+  watermark = '',
 ): Promise<ExportResult> {
   const baseName = sanitizeFileName(project.name)
   const orderedPages = [...pages].sort((left, right) => left.order - right.order)
@@ -146,7 +175,7 @@ export async function exportProject(
 
   if (project.mode === 'id-card') {
     const mimeType = format === 'png' ? 'image/png' : 'image/jpeg'
-    const composition = await composeIdCard(orderedPages, mimeType, onProgress)
+    const composition = await composeIdCard(orderedPages, mimeType, onProgress, watermark)
     if (format === 'pdf') {
       const pdf = await createPdf([composition], 'a4', true)
       onProgress?.(100, messages.pdfGenerated)
