@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import {
-  ArrowRight,
   Check,
   Download,
   FileImage,
@@ -475,13 +474,6 @@ export function QuickCopyPage() {
             </Button>
           </section>
         </div>
-        <footer className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6 text-xs text-muted-foreground">
-          <span>本页不保存照片, 刷新即清空. 无需注册.</span>
-          <Link to="/tools" className="flex items-center gap-1 hover:text-primary">
-            完整扫描工具 (含本地历史) <ArrowRight className="size-3" />
-          </Link>
-          <span>基于 Clear Scan · AGPL-3.0</span>
-        </footer>
       </main>
       <Dialog
         open={!!editing && !!editPage}
