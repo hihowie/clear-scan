@@ -330,14 +330,6 @@ export function QuickCopyPage() {
               </span>
             </span>
           </Link>
-          <a
-            href="https://github.com/hihowie/clear-scan"
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs text-muted-foreground hover:text-primary"
-          >
-            开源代码 ↗
-          </a>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-5 pb-12 pt-10 sm:pt-14">
@@ -488,18 +480,7 @@ export function QuickCopyPage() {
           <Link to="/tools" className="flex items-center gap-1 hover:text-primary">
             完整扫描工具 (含本地历史) <ArrowRight className="size-3" />
           </Link>
-          <span>
-            基于{' '}
-            <a
-              href="https://github.com/rmb122/clear-scan"
-              target="_blank"
-              rel="noreferrer"
-              className="underline"
-            >
-              Clear Scan
-            </a>{' '}
-            · AGPL-3.0
-          </span>
+          <span>基于 Clear Scan · AGPL-3.0</span>
         </footer>
       </main>
       <Dialog

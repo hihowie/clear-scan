@@ -11,8 +11,6 @@ export const zh = {
   homeLink: '清晰扫描首页',
   mainNavigation: '主导航',
   mobileNavigation: '移动端主导航',
-  viewSource: '查看项目源代码',
-  sourceCode: '源代码',
   close: '关闭',
   cancel: '取消',
   delete: '删除',

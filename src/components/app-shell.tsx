@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { Code2, FolderClock, Home, ScanLine } from 'lucide-react'
+import { FolderClock, Home, ScanLine } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { BrandLogo } from './brand-logo'
 import { LanguageButton } from './language-button'
 import { InstallButton, OnlineBadge, PwaLifecycle } from './pwa-controls'
 import { RouteLoadingOverlay } from './route-loading-overlay'
-import { Button } from '@/components/ui/button'
 import { ScannerNavigationContext } from '@/hooks/use-scanner-navigation'
 import { hasCachedEngineAsset } from '@/lib/engine-cache'
 import { cn } from '@/lib/utils'
@@ -75,26 +74,6 @@ export function AppShell() {
           <div className="flex items-center gap-1 sm:gap-2">
             <OnlineBadge />
             <LanguageButton />
-            <Button asChild variant="ghost" size="icon" className="sm:hidden">
-              <a
-                href="https://github.com/hihowie/clear-scan"
-                target="_blank"
-                rel="noreferrer"
-                aria-label={messages.viewSource}
-              >
-                <Code2 />
-              </a>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="hidden text-sm sm:inline-flex">
-              <a
-                href="https://github.com/hihowie/clear-scan"
-                target="_blank"
-                rel="noreferrer"
-                aria-label={messages.viewSource}
-              >
-                <Code2 /> {messages.sourceCode}
-              </a>
-            </Button>
             <InstallButton />
           </div>
         </div>

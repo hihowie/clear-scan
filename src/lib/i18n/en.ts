@@ -13,8 +13,6 @@ export const en = {
   homeLink: 'Clear Scan home',
   mainNavigation: 'Main navigation',
   mobileNavigation: 'Mobile navigation',
-  viewSource: 'View source code',
-  sourceCode: 'Source code',
   close: 'Close',
   cancel: 'Cancel',
   delete: 'Delete',
