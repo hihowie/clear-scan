@@ -488,7 +488,7 @@ export function QuickCopyPage() {
               拖动四角对齐证件边缘, 然后确认. 自动识别不可靠时需要手动确认.
             </DialogDescription>
           </DialogHeader>
-          <div className="relative h-[min(50svh,440px)] overflow-hidden rounded-xl bg-workspace p-10">
+          <div className="relative h-[min(65svh,620px)] min-h-64 overflow-hidden rounded-xl bg-workspace">
             {editPage && editUrl && editing && (
               <CropEditor
                 key={editPage.id}

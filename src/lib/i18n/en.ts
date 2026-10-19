@@ -317,6 +317,12 @@ export const en = {
   pendingConfirmation: 'Unconfirmed',
   addPage: 'Add page',
   cropImageAlt: 'Document to crop',
+  cropZoomIn: 'Zoom in crop image',
+  cropZoomOut: 'Zoom out crop image',
+  cropZoomLevel: 'Crop zoom level',
+  cropFit: 'Fit to window',
+  cropPrecisionHint:
+    'Scroll or pinch to zoom, drag background to pan; arrow keys adjust corners, Shift for larger steps',
   cropDetectedHint: 'Edges detected. Please confirm them.',
   cropAdjustedHint: 'Edges adjusted manually',
   cropFallbackHint: 'Detection was uncertain. Drag the four corners.',
